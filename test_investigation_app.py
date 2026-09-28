@@ -149,7 +149,19 @@ def test_fastapi_endpoints():
     resp = client.get("/refresh-data", cookies=cookies, follow_redirects=False)
     assert resp.status_code == 302
 
+    # 15. Source Switching Endpoints (GET and POST)
+    resp = client.get("/set-source?source=network", cookies=cookies, follow_redirects=False)
+    assert resp.status_code == 302
+
+    resp = client.post("/set-source", data={"source": "local"}, cookies=cookies, follow_redirects=False)
+    assert resp.status_code == 302
+
+    # Verify back on local
+    data = get_cached_investigation_data()
+    assert data["total_records"] == 275
+
     print("PASS: All FastAPI endpoint tests")
+
 
 
 if __name__ == "__main__":

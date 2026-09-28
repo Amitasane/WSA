@@ -26,10 +26,27 @@
     </div>
 
     {% if not hide_home_icon %}
-    <div class="header-actions">
-        <a href="/refresh-data" class="header-btn" title="Reload Excel Workbook" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:6px;background:var(--blue-soft);color:var(--blue);text-decoration:none;border:1px solid rgba(0,82,212,0.2);margin-right:12px;">
-            <span>↻</span> Reload Data
+    <div class="header-actions" style="display:flex; align-items:center; gap:10px;">
+        <!-- Data Source Switcher -->
+        <div class="source-selector-wrapper" style="display:inline-flex; align-items:center; background:#f4f7fb; border:1px solid var(--border); border-radius:6px; padding:3px 10px; font-size:12px;">
+            <span style="color:var(--muted); margin-right:6px; font-size:11px; font-weight:600;">SOURCE:</span>
+            <select id="headerSourceSelect" onchange="if(this.value) window.location.href='/set-source?source='+this.value;" style="border:none; background:transparent; font-size:12px; font-weight:600; color:var(--navy); cursor:pointer; outline:none;">
+                <option value="local" {% if active_source and active_source.id == 'local' %}selected{% endif %}>📁 Local Copy</option>
+                <option value="network" {% if active_source and active_source.id == 'network' %}selected{% endif %}>🏢 Bosch Network Share</option>
+            </select>
+            {% if active_source %}
+                {% if active_source.is_accessible %}
+                <span title="Active source is accessible and live" style="display:inline-block; width:8px; height:8px; background:#17824B; border-radius:50%; margin-left:6px;"></span>
+                {% else %}
+                <span title="Active source is unreachable (check network/VPN)" style="display:inline-block; width:8px; height:8px; background:#C93446; border-radius:50%; margin-left:6px;"></span>
+                {% endif %}
+            {% endif %}
+        </div>
+
+        <a href="/refresh-data" class="header-btn" title="Reload active workbook" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:6px;background:var(--blue-soft);color:var(--blue);text-decoration:none;border:1px solid rgba(0,82,212,0.2);">
+            <span>↻</span> Reload
         </a>
+
         <a href="/" class="header-home" title="Home">
             <img src="/static/images/home.png" class="home-icon" alt="Home">
         </a>
@@ -56,7 +73,13 @@
             <a href="/download" class="sidebar-link {% if request.url.path == '/download' %}active{% endif %}"><span class="nav-icon">⇩</span><span>Reports &amp; Export</span></a>
         </div>
         <div class="sidebar-bottom">
-            <div class="sidebar-status"><span class="status-dot"></span><div><strong>System Active</strong><small>Investigation Excel Source</small></div></div>
+            <div class="sidebar-status">
+                <span class="status-dot" style="background:{% if active_source and not active_source.is_accessible %}var(--red){% else %}#38d57a{% endif %};"></span>
+                <div>
+                    <strong>System Active</strong>
+                    <small title="{{ active_source.path if active_source else '' }}">{{ active_source.badge if active_source else 'Investigation Excel' }}</small>
+                </div>
+            </div>
             <a href="/logout" class="sidebar-link logout-link"><span class="nav-icon">↪</span><span>Logout</span></a>
         </div>
     </aside>

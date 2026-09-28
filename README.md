@@ -129,19 +129,55 @@ The application loads and normalizes records from the two primary investigation 
 
 ---
 
-## 5. Configuration & Setup
+## 5. Data Sources & Configuration
 
-### Environment Variables
-Configure the active Excel source workbook without modifying code:
+The application provides dual-source support, allowing seamless switching between the Bosch Network Share and the Local Repository Copy:
 
-| Variable | Description | Default Fallback |
+### Configured Sources
+1. **Bosch Corporate Network Share:**
+   ```text
+   \\na02fs01.apac.bosch.com\Na_QMM_02_Projects$\08_QMM3_Associates\0-km Analysis Center\05_Customer complaint investigation\02_Investigation reports\2026\details\2026(3) - Investigation Dashboard updated.xlsx
+   ```
+2. **Local Repository Copy (Offline / Development):**
+   ```text
+   2026(3) - Investigation Dashboard updated.xlsx
+   ```
+
+### Choosing Between Data Sources
+You can choose the active data source using three methods:
+
+#### 1. In the Web UI (Instant Switcher)
+Use the **SOURCE** dropdown directly in the top header:
+- Select **📁 Local Copy** for offline testing.
+- Select **🏢 Bosch Network Share** when on the Bosch corporate intranet / VPN.
+- A live status indicator shows green when the file is reachable, or red if unreachable.
+
+#### 2. In Code (`backend/investigation_loader.py`)
+```python
+from backend.investigation_loader import set_active_source
+
+# Switch to Bosch corporate network share
+set_active_source("network")
+
+# Switch to local repository copy
+set_active_source("local")
+```
+
+#### 3. Via Environment Variables
+| Variable | Values / Description | Default Fallback |
 | :--- | :--- | :--- |
-| `INVESTIGATION_EXCEL_FILE` | Absolute path to the Excel workbook | `2026(3) - Investigation Dashboard updated.xlsx` (in repo root) |
+| `INVESTIGATION_SOURCE` | `network` or `local` | `local` |
+| `INVESTIGATION_EXCEL_FILE` | Custom absolute path override | Uses active source selection |
 
 **PowerShell Example:**
 ```powershell
-$env:INVESTIGATION_EXCEL_FILE="C:\path\to\2026(3) - Investigation Dashboard updated.xlsx"
+# Set default to Bosch network share
+$env:INVESTIGATION_SOURCE="network"
+
+# Or set custom override path
+$env:INVESTIGATION_EXCEL_FILE="\\na02fs01.apac.bosch.com\Na_QMM_02_Projects$\08_QMM3_Associates\0-km Analysis Center\05_Customer complaint investigation\02_Investigation reports\2026\details\2026(3) - Investigation Dashboard updated.xlsx"
 ```
+
 
 ### Installation
 ```powershell

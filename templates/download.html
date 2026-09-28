@@ -97,14 +97,17 @@
     <!-- Source & Schema Info Cards -->
     <section class="dashboard-grid two-column">
         <div class="panel">
-            <span class="section-kicker">DATA SOURCE</span>
-            <h3>Master Workbook</h3>
+            <span class="section-kicker">DATA SOURCE CONFIGURATION</span>
+            <h3>Active Workbook</h3>
             <p class="excel-description">
-                Active Source: <strong>{{ source_filename }}</strong><br>
+                Active Source: <strong>{{ active_source.name if active_source else source_filename }}</strong><br>
+                Path: <code style="font-size:11px; word-break:break-all;">{{ active_source.path if active_source else source_filename }}</code><br>
+                Status: {% if active_source and active_source.is_accessible %}<span class="status-badge status-ok">Connected &middot; File Live</span>{% else %}<span class="status-badge status-nok">Offline / Unreachable</span>{% endif %}<br>
                 Sheets: <strong>CRI</strong> (183 cases) &amp; <strong>CRIN</strong> (92 cases)<br>
                 Total: <strong>275 verified investigation records</strong> throughout 2026.
             </p>
         </div>
+
 
         <div class="panel">
             <span class="section-kicker">DATA DICTIONARY</span>

@@ -14,8 +14,16 @@ from openpyxl import load_workbook
 # Default workbook path inside repository
 DEFAULT_EXCEL_FILENAME = "2026(3) - Investigation Dashboard updated.xlsx"
 
-# Environment variable name for override
+# Bosch Corporate Network Share Path
+BOSCH_NETWORK_PATH = r"\\na02fs01.apac.bosch.com\Na_QMM_02_Projects$\08_QMM3_Associates\0-km Analysis Center\05_Customer complaint investigation\02_Investigation reports\2026\details\2026(3) - Investigation Dashboard updated.xlsx"
+
+# Environment variable names
 ENV_EXCEL_VAR = "INVESTIGATION_EXCEL_FILE"
+ENV_SOURCE_VAR = "INVESTIGATION_SOURCE"  # 'local', 'network', 'custom'
+
+# Active source state (default to local, or env var if set)
+_ACTIVE_SOURCE_ID: str = os.environ.get(ENV_SOURCE_VAR, "local").lower()
+_CUSTOM_EXCEL_PATH: str = os.environ.get(ENV_EXCEL_VAR, "").strip()
 
 # Thread safety lock for cache
 _CACHE_LOCK = threading.Lock()
@@ -23,24 +31,101 @@ _DATA_CACHE: Optional[Dict[str, Any]] = None
 _CACHE_TIMESTAMP: Optional[datetime] = None
 
 
-def get_excel_file_path() -> str:
-    """Return the active Excel file path from env var or repository default."""
-    env_path = os.environ.get(ENV_EXCEL_VAR)
-    if env_path and env_path.strip():
-        return env_path.strip()
-    
-    # Try current directory or parent directory
+def get_local_file_path() -> str:
+    """Return absolute path to the local repository copy."""
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     local_path = os.path.join(base_dir, DEFAULT_EXCEL_FILENAME)
     if os.path.exists(local_path):
         return local_path
-    
-    # Fallback to current working directory
     cwd_path = os.path.abspath(DEFAULT_EXCEL_FILENAME)
     if os.path.exists(cwd_path):
         return cwd_path
-        
     return local_path
+
+
+def get_available_sources() -> List[Dict[str, Any]]:
+    """Return all configured data sources with their current accessibility and active status."""
+    local_path = get_local_file_path()
+    custom_path = _CUSTOM_EXCEL_PATH or os.environ.get(ENV_EXCEL_VAR, "").strip()
+
+    return [
+        {
+            "id": "local",
+            "name": "Local Repository Copy",
+            "path": local_path,
+            "filename": os.path.basename(local_path),
+            "is_accessible": os.path.exists(local_path),
+            "is_active": (_ACTIVE_SOURCE_ID == "local"),
+            "badge": "Local Copy",
+            "description": "Local offline workbook bundled with repository",
+        },
+        {
+            "id": "network",
+            "name": "Bosch Network Share",
+            "path": BOSCH_NETWORK_PATH,
+            "filename": os.path.basename(BOSCH_NETWORK_PATH),
+            "is_accessible": os.path.exists(BOSCH_NETWORK_PATH),
+            "is_active": (_ACTIVE_SOURCE_ID == "network"),
+            "badge": "Bosch Network",
+            "description": r"\\na02fs01.apac.bosch.com\Na_QMM_02_Projects$\...",
+        },
+        {
+            "id": "custom",
+            "name": "Custom File Path",
+            "path": custom_path,
+            "filename": os.path.basename(custom_path) if custom_path else "",
+            "is_accessible": bool(custom_path and os.path.exists(custom_path)),
+            "is_active": (_ACTIVE_SOURCE_ID == "custom"),
+            "badge": "Custom Path",
+            "description": custom_path or "Set via INVESTIGATION_EXCEL_FILE",
+        },
+    ]
+
+
+def get_active_source_info() -> Dict[str, Any]:
+    """Return details of currently selected data source."""
+    sources = get_available_sources()
+    for s in sources:
+        if s["id"] == _ACTIVE_SOURCE_ID:
+            return s
+    return sources[0]  # Fallback to local
+
+
+def get_excel_file_path() -> str:
+    """Return the active file path based on selected source mode."""
+    global _ACTIVE_SOURCE_ID, _CUSTOM_EXCEL_PATH
+    
+    if _ACTIVE_SOURCE_ID == "network":
+        return BOSCH_NETWORK_PATH
+    elif _ACTIVE_SOURCE_ID == "custom" and _CUSTOM_EXCEL_PATH:
+        return _CUSTOM_EXCEL_PATH
+    elif _ACTIVE_SOURCE_ID == "custom" and os.environ.get(ENV_EXCEL_VAR):
+        return os.environ.get(ENV_EXCEL_VAR).strip()
+    
+    # Default to local
+    return get_local_file_path()
+
+
+def set_active_source(source_id: str, custom_path: Optional[str] = None) -> Dict[str, Any]:
+    """Change the active data source, clear cache, and reload."""
+    global _ACTIVE_SOURCE_ID, _CUSTOM_EXCEL_PATH
+    
+    clean_id = (source_id or "local").lower().strip()
+    if clean_id not in ("local", "network", "custom"):
+        clean_id = "local"
+        
+    _ACTIVE_SOURCE_ID = clean_id
+    if custom_path:
+        _CUSTOM_EXCEL_PATH = custom_path.strip()
+
+    # Invalidate and reload
+    result = reload_investigation_data()
+    return {
+        "active_source": get_active_source_info(),
+        "total_records": result["total_records"],
+        "error": result["error"],
+    }
+
 
 
 
@@ -304,6 +389,8 @@ def load_investigation_workbook(excel_path: Optional[str] = None) -> Dict[str, A
     
     result = {
         "source_file": path,
+        "active_source": get_active_source_info(),
+        "available_sources": get_available_sources(),
         "loaded_at": datetime.now(),
         "error": "",
         "records": [],
@@ -319,8 +406,15 @@ def load_investigation_workbook(excel_path: Optional[str] = None) -> Dict[str, A
     }
     
     if not os.path.exists(path):
-        result["error"] = f"Investigation workbook not found at: {path}"
+        if path == BOSCH_NETWORK_PATH:
+            result["error"] = (
+                f"Bosch Network Share is not reachable: {path}. "
+                "Ensure your workstation is connected to the Bosch intranet/VPN, or switch to the Local Repository Copy."
+            )
+        else:
+            result["error"] = f"Investigation workbook not found at: {path}"
         return result
+
         
     try:
         wb = load_workbook(path, data_only=True, read_only=True)

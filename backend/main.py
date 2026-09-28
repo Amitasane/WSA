@@ -17,7 +17,12 @@ from backend.investigation_loader import (
     get_cached_investigation_data,
     reload_investigation_data,
     get_excel_file_path,
+    get_available_sources,
+    get_active_source_info,
+    set_active_source,
+    BOSCH_NETWORK_PATH,
 )
+
 from backend.investigation_analytics import (
     filter_investigation_records,
     calculate_kpis,
@@ -122,7 +127,7 @@ def logout():
     return response
 
 
-# ================= DATA RELOAD =================
+# ================= DATA RELOAD & SOURCE MANAGEMENT =================
 
 @app.get("/refresh-data")
 def refresh_data(request: Request):
@@ -135,6 +140,42 @@ def refresh_data(request: Request):
     reload_investigation_data()
     referer = request.headers.get("referer") or "/dashboard"
     return RedirectResponse(referer, status_code=302)
+
+
+@app.get("/set-source")
+def switch_source_get(
+    request: Request,
+    source: str = Query("local"),
+    custom_path: Optional[str] = Query(None),
+):
+    """Switch active data source between Local, Bosch Network Share, or Custom."""
+    try:
+        get_current_user(request)
+    except Exception:
+        return RedirectResponse("/login")
+
+    set_active_source(source, custom_path)
+    referer = request.headers.get("referer") or "/dashboard"
+    base_url = referer.split("?")[0]
+    return RedirectResponse(base_url, status_code=302)
+
+
+@app.post("/set-source")
+def switch_source_post(
+    request: Request,
+    source: str = Form("local"),
+    custom_path: Optional[str] = Form(None),
+):
+    """Switch active data source via form submission."""
+    try:
+        get_current_user(request)
+    except Exception:
+        return RedirectResponse("/login")
+
+    set_active_source(source, custom_path)
+    referer = request.headers.get("referer") or "/dashboard"
+    base_url = referer.split("?")[0]
+    return RedirectResponse(base_url, status_code=302)
 
 
 # ================= HOME =================
@@ -150,7 +191,10 @@ def home(request: Request):
         "request": request,
         "show_header": True,
         "user": user,
+        "active_source": get_active_source_info(),
+        "available_sources": get_available_sources(),
     })
+
 
 
 # ================= DASHBOARD =================
@@ -201,7 +245,10 @@ def dashboard(
         "user": user,
         "source_filename": source_filename,
         "source_error": data["error"],
+        "active_source": get_active_source_info(),
+        "available_sources": get_available_sources(),
         "kpis": kpis,
+
         "trend_data": trend_data,
         "pareto_data": pareto_data,
         "customer_data": customer_data,
@@ -273,7 +320,10 @@ def view_records(
         "total_pages": total_pages,
         "page_size": page_size,
         "source_error": data["error"],
+        "active_source": get_active_source_info(),
+        "available_sources": get_available_sources(),
         "filters": {
+
             "product_class": product_class,
             "month": month,
             "customer": customer,
@@ -333,7 +383,10 @@ def analytics_page(
         "show_header": True,
         "user": user,
         "source_error": data["error"],
+        "active_source": get_active_source_info(),
+        "available_sources": get_available_sources(),
         "active_group_by": group_by,
+
         "available_dimensions": AVAILABLE_DIMENSIONS,
         "kpis": kpis,
         "analytics_data": analytics_breakdown,
@@ -410,6 +463,8 @@ def observations(
         "show_header": True,
         "user": user,
         "source_error": data["error"],
+        "active_source": get_active_source_info(),
+        "available_sources": get_available_sources(),
         "observations": filtered,
         "total_observations": len(filtered),
         "kpis": kpis,
@@ -446,7 +501,10 @@ def download_page(request: Request):
         "total_rows": data["total_records"],
         "source_filename": source_filename,
         "source_error": data["error"],
+        "active_source": get_active_source_info(),
+        "available_sources": get_available_sources(),
         "filter_options": {
+
             "months": data["months"],
             "customers": data["customers"],
             "complaint_types": data["complaint_types"],
