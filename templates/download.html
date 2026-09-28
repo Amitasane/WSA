@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}WSA Reports & Export{% endblock %}
+{% block content %}
+
+<div class="page-content">
+    <div class="page-hero compact-hero">
+        <div>
+            <div class="eyebrow">REPORTING</div>
+            <h1>Reports &amp; Export</h1>
+            <p>Export the same master Excel fields used across Dashboard, View Records, Analytics and Observations.</p>
+        </div>
+        <div class="hero-stat"><strong>{{ total_rows }}</strong><span>source rows</span></div>
+    </div>
+
+    {% if source_error %}<div class="alert-card danger-alert">{{ source_error }}</div>{% endif %}
+
+    <section class="panel">
+        <div class="panel-header"><div><span class="section-kicker">CSV EXPORT</span><h3>Export Excel data</h3></div></div>
+        <form method="post" class="record-form">
+            <div><label>From Date</label><input type="date" name="from_date"></div>
+            <div><label>To Date</label><input type="date" name="to_date"></div>
+            <div><label>Status</label><select name="status"><option value="All">All Records</option><option value="OK">OK Records</option><option value="NOK">NOK Records</option></select></div>
+            <div class="filter-actions"><button type="submit" class="primary-btn">Download CSV</button></div>
+        </form>
+    </section>
+
+    <section class="dashboard-grid two-column">
+        <div class="panel"><span class="section-kicker">SOURCE</span><h3>Master data</h3><p class="excel-description">Workbook: <strong>CRIN Line rejection analysis updated.xlsx</strong><br>Sheet: <strong>Particle Summary</strong><br>Fields: 17 master Excel columns plus a derived Status column.</p></div>
+        <div class="panel"><span class="section-kicker">STATUS RULE</span><h3>OK / NOK classification</h3><p class="excel-description"><strong>NOK:</strong> Rejection Date is filled.<br><strong>OK:</strong> Rejection Date is blank.</p></div>
+    </section>
+</div>
+{% endblock %}

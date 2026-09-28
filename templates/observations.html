@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}WSA Observations{% endblock %}
+{% block content %}
+
+<div class="page-content">
+    <div class="page-hero compact-hero">
+        <div>
+            <div class="eyebrow">OBSERVATIONS</div>
+            <h1>Quality Observations</h1>
+            <p>Review rejection and particle observations directly from the master Excel data.</p>
+        </div>
+        <div class="hero-stat"><strong>{{ total_records }}</strong><span>visible rows</span></div>
+    </div>
+
+    {% if source_error %}<div class="alert-card danger-alert">{{ source_error }}</div>{% endif %}
+
+    <div class="dashboard-cards">
+        <div class="metric-card metric-red"><div class="metric-icon">!</div><div><span>NOK Records</span><strong>{{ nok_records }}</strong></div></div>
+        <div class="metric-card metric-blue"><div class="metric-icon">●</div><div><span>Particle Findings</span><strong>{{ particle_rows }}</strong></div></div>
+        <div class="metric-card metric-green"><div class="metric-icon">◫</div><div><span>Defective Parts Checked</span><strong>{{ parts_checked|int }}</strong></div></div>
+        <div class="metric-card metric-purple"><div class="metric-icon">⇧</div><div><span>Rejection Shifts</span><strong>{{ options['Rejection Shift']|length }}</strong></div></div>
+    </div>
+
+    <div class="filter-card">
+        <div class="filter-heading"><div><span class="section-kicker">FILTERS</span><h3>Observation search</h3></div><a href="/observations" class="reset-btn compact">Reset</a></div>
+        <form method="get" class="dashboard-filters">
+
+    <div class="filter-field">
+        <label>Search</label>
+        <input
+            type="text"
+            name="search"
+            value="{{ filters.search or '' }}"
+            placeholder="Search across Excel fields"
+        >
+    </div>
+
+    <div class="filter-field">
+        <label>From Date</label>
+        <input
+            type="date"
+            name="from_date"
+            value="{{ filters.from_date or '' }}"
+        >
+    </div>
+
+    <div class="filter-field">
+        <label>To Date</label>
+        <input
+            type="date"
+            name="to_date"
+            value="{{ filters.to_date or '' }}"
+        >
+    </div>
+
+    <div class="filter-field">
+        <label>Shift</label>
+        <select name="shift">
+            <option value="">All</option>
+            {% for item in options['Shift'] %}
+            <option
+                value="{{ item }}"
+                {% if filters.shift == item %}selected{% endif %}
+            >
+                {{ item }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-actions">
+        <button type="submit" class="primary-btn">
+            Apply Filters
+        </button>
+    </div>
+
+</form>
+    </div>
+
+    <section class="panel excel-panel">
+        <div class="panel-header"><div><span class="section-kicker">OBSERVATION DATA</span><h3>{{ records|length }} row(s) shown</h3></div><span class="muted">Status is derived from Rejection Date</span></div>
+        <div class="table-wrap">
+            <table class="records-table excel-wide-table">
+                <thead><tr>{% for header in headers %}<th>{{ header }}</th>{% endfor %}<th>Status</th></tr></thead>
+                <tbody>
+                {% for record in records %}
+                <tr>{% for header in headers %}<td>{{ record[header] or '-' }}</td>{% endfor %}<td>{% if record.status == 'NOK' %}<span class="status-badge status-nok">NOK</span>{% else %}<span class="status-badge status-pending">PENDING</span>{% endif %}</td></tr>
+                {% else %}<tr><td colspan="18" class="empty-cell">No observation rows found for the selected filters.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

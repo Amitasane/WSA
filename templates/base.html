@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a1f44">
+    <title>{% block title %}WSA - Within Shift Analysis{% endblock %}</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+{% if show_header %}
+<div class="top-header">
+    <div class="brand-block">
+        <img src="/static/images/logo.png" class="logo-img" alt="WSA logo">
+        <div class="brand-copy">
+            <span class="brand-title">WSA</span>
+            <span class="brand-subtitle">Within Shift Analysis</span>
+        </div>
+    </div>
+
+    <div class="title-section">
+        <span>Production Quality &amp; Audit Management</span>
+    </div>
+
+    {% if not hide_home_icon %}
+    <div class="header-actions">
+        <a href="/" class="header-home" title="Home">
+            <img src="/static/images/home.png" class="home-icon" alt="Home">
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% set auth_page = request.url.path in ['/login', '/register'] %}
+
+{% if show_header and not auth_page %}
+<div class="app-shell">
+    <aside class="sidebar">
+        <div>
+            <div class="sidebar-heading">
+                <span class="sidebar-heading-mark">WSA</span>
+                <div><strong>Within Shift</strong><small>Analysis</small></div>
+            </div>
+            <div class="sidebar-section-label">MAIN</div>
+            <a href="/dashboard" class="sidebar-link {% if request.url.path == '/dashboard' %}active{% endif %}"><span class="nav-icon">⌂</span><span>Dashboard</span></a>
+            <a href="/view" class="sidebar-link {% if request.url.path == '/view' %}active{% endif %}"><span class="nav-icon">▤</span><span>View Records</span></a>
+            <a href="/analytics" class="sidebar-link {% if request.url.path == '/analytics' %}active{% endif %}"><span class="nav-icon">▥</span><span>Analytics</span></a>
+            <a href="/observations" class="sidebar-link {% if request.url.path == '/observations' %}active{% endif %}"><span class="nav-icon">⚠</span><span>Observations</span></a>
+            <a href="/download" class="sidebar-link {% if request.url.path == '/download' %}active{% endif %}"><span class="nav-icon">⇩</span><span>Reports &amp; Export</span></a>
+        </div>
+        <div class="sidebar-bottom">
+            <div class="sidebar-status"><span class="status-dot"></span><div><strong>System Active</strong><small>Live Excel source</small></div></div>
+            <a href="/logout" class="sidebar-link logout-link"><span class="nav-icon">↪</span><span>Logout</span></a>
+        </div>
+    </aside>
+      <main class="app-main">
+       <div
+    <div class="global-bosch-ribbon"
+     style="width:100%;height:24px;max-height:24px;min-height:24px;overflow:hidden;line-height:0;margin:0;padding:0;">
+
+    <img src="/static/images/bosch-ribbon.png"
+         alt="Bosch Ribbon"
+         style="display:block;width:100%;height:24px;max-height:24px;object-fit:cover;object-position:center;margin:0;padding:0;">
+
+</div>
+{% endif %}
+
+{% block content %}{% endblock %}
+
+
+{% if show_header and not auth_page %}
+    </main>
+</div>
+{% endif %}
+
+</body>
+</html>

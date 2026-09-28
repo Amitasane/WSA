@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}WSA Dashboard{% endblock %}
+{% block content %}
+
+<div class="page-content dashboard-page">
+    <div class="page-hero">
+        <div>
+            <div class="eyebrow">QUALITY MONITORING</div>
+            <h1>WSA Dashboard</h1>
+            <p>Live production-quality overview powered by the Bosch <strong>Particle Summary</strong> Excel sheet.</p>
+        </div>
+        <div class="hero-date">
+            <span class="hero-date-label">Today</span>
+            <strong>{{ current_date }}</strong>
+        </div>
+    </div>
+
+    {% if source_error %}
+    <div class="alert-card danger-alert">{{ source_error }}</div>
+    {% endif %}
+
+    <section class="panel excel-panel dashboard-front-excel">
+        <div class="panel-header">
+            <div>
+                <span class="section-kicker">LIVE EXCEL DATA</span>
+                <h3>Particle Summary — Complete Excel Data</h3>
+                <p class="excel-description">
+                    Source: <strong>CRIN Line rejection analysis updated.xlsx</strong> &middot;
+                    Sheet: <strong>Particle Summary</strong> &middot;
+                    The complete Excel data is displayed below.
+                </p>
+            </div>
+            <span class="status-badge status-ok">{{ excel_total_rows }} source rows</span>
+        </div>
+        {% if excel_headers and excel_rows %}
+        <div class="excel-table-container full-excel-table-container">
+            <table class="excel-table records-table">
+                <thead>
+                    <tr>
+                        {% for header in excel_headers %}
+                        <th>{{ header }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in excel_rows %}
+                    <tr>
+                        {% for value in row %}
+                        <td>{{ value }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">No Excel records available.</div>
+        {% endif %}
+    </section>
+
+    <div class="dashboard-cards">
+
+    <div class="metric-card metric-blue">
+        <div class="metric-icon">▤</div>
+        <div>
+            <span>Total Records</span>
+            <strong class="counter" data-target="{{ total_records }}">0</strong>
+        </div>
+    </div>
+
+    <div class="metric-card metric-green">
+        <div class="metric-icon">✓</div>
+        <div>
+            <span>OK Records</span>
+            <strong class="counter" data-target="{{ ok_records }}">0</strong>
+        </div>
+    </div>
+
+    <div class="metric-card metric-purple">
+        <div class="metric-icon">…</div>
+        <div>
+            <span>Pending Records</span>
+            <strong class="counter" data-target="{{ pending_records }}">0</strong>
+        </div>
+    </div>
+
+    <div class="metric-card metric-red">
+        <div class="metric-icon">!</div>
+        <div>
+            <span>NOK Records</span>
+            <strong class="counter" data-target="{{ nok_records }}">0</strong>
+        </div>
+    </div>
+
+    <div class="metric-card metric-green">
+        <div class="metric-icon">◫</div>
+        <div>
+            <span>Parts Checked</span>
+            <strong class="counter" data-target="{{ parts_checked }}">0</strong>
+        </div>
+    </div>
+
+    <div class="metric-card metric-purple">
+        <div class="metric-icon">%</div>
+        <div>
+            <span>NOK Rate</span>
+            <strong>{{ nok_rate }}%</strong>
+            <small>Based on NOK records / parts checked</small>
+        </div>
+    </div>
+
+</div>
+
+    <div class="dashboard-grid two-column">
+        <section class="panel chart-panel">
+            <div class="panel-header"><div><span class="section-kicker">TREND</span><h3>Monthly Records vs OK vs NOK</h3></div></div>
+            <div class="chart-box"><canvas id="dailyTrendChart"></canvas></div>
+        </section>
+        <section class="panel chart-panel">
+            <div class="panel-header"><div><span class="section-kicker">SHIFT</span><h3>Shift-wise NOK</h3></div></div>
+            <div class="chart-box small-chart"><canvas id="shiftChart"></canvas></div>
+        </section>
+    </div>
+
+    <div class="dashboard-grid two-column">
+        <section class="panel chart-panel">
+            <div class="panel-header"><div><span class="section-kicker">STATION</span><h3>Station-wise NOK</h3></div></div>
+            <div class="chart-box small-chart"><canvas id="stationChart"></canvas></div>
+        </section>
+        <section class="panel">
+            <div class="panel-header"><div><span class="section-kicker">RECENT</span><h3>Recent NOK Records</h3></div><a href="/observations" class="text-link">View all</a></div>
+            {% if recent_nok %}
+            <div class="table-wrap">
+                <table class="records-table compact-table">
+                    <thead><tr><th>Date</th><th>Rejection Date</th><th>Type</th><th>Shift</th><th>Station</th><th>Customer</th></tr></thead>
+                    <tbody>{% for row in recent_nok %}<tr><td>{{ row['Date'] }}</td><td>{{ row['Rejection Date'] or '-' }}</td><td>{{ row['Type'] }}</td><td>{{ row['Shift'] }}</td><td>{{ row['Station'] }}</td><td>{{ row['Customer'] }}</td></tr>{% endfor %}</tbody>
+                </table>
+            </div>
+            {% else %}<div class="empty-state">No NOK records match the current filters.</div>{% endif %}
+        </section>
+    </div>
+
+    <section class="panel">
+        <div class="panel-header"><div><span class="section-kicker">AUDITOR ACTIVITY</span><h3>Records by Auditor</h3></div></div>
+        {% if auditor_counts %}
+        <div class="auditor-grid">
+            {% for auditor, count in auditor_counts.items() %}
+            <div class="mini-card"><div class="mini-card-title">{{ auditor }}</div><div class="mini-card-value">{{ count }}</div><div class="muted">records</div></div>
+            {% endfor %}
+        </div>
+        {% else %}<div class="empty-state">No records match the selected filters.</div>{% endif %}
+    </section>
+
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+window.WSA_DASHBOARD = {
+    dailyLabels: {{ daily_labels | tojson }},
+    dailyRecords: {{ daily_records | tojson }},
+    dailyOk: {{ daily_ok | tojson }},
+    dailyNok: {{ daily_nok | tojson }},
+    shiftLabels: {{ shift_labels | tojson }},
+    shiftNok: {{ shift_nok | tojson }},
+    stationLabels: {{ station_labels | tojson }},
+    stationNok: {{ station_nok | tojson }}
+};
+</script>
+<script src="/static/dashboard.js"></script>
+{% endblock %}

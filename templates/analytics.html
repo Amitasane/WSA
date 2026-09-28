@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}WSA Analytics{% endblock %}
+{% block content %}
+
+<div class="page-content">
+    <div class="page-hero compact-hero">
+        <div>
+            <div class="eyebrow">QUALITY ANALYTICS</div>
+            <h1>Analytics</h1>
+            <p>Group the live Excel data by an actual master field and compare production volume with NOK records.</p>
+        </div>
+    </div>
+
+    {% if source_error %}<div class="alert-card danger-alert">{{ source_error }}</div>{% endif %}
+
+    <div class="filter-card">
+        <div class="filter-heading">
+            <div><span class="section-kicker">ANALYSIS</span><h3>Choose the Excel field to analyze</h3></div>
+            <a href="/analytics" class="reset-btn compact">Reset</a>
+        </div>
+        <form method="get" class="dashboard-filters">
+            <div class="filter-field"><label>Analysis Type</label><select name="analysis_type">{% for field in analysis_fields %}<option value="{{ field }}" {% if analysis_type == field %}selected{% endif %}>{{ field }}</option>{% endfor %}</select></div>
+            <div class="filter-field"><label>From Date</label><input type="date" name="from_date" value="{{ filters.from_date or '' }}"></div>
+            <div class="filter-field"><label>To Date</label><input type="date" name="to_date" value="{{ filters.to_date or '' }}"></div>
+            <div class="filter-field"><label>Shift Filter</label><select name="shift"><option value="">All</option>{% for item in options['Shift'] %}<option value="{{ item }}" {% if filters.shift == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></div>
+            <div class="filter-field"><label>Status</label><select name="status"><option value="" {% if not filters.status %}selected{% endif %}>All</option><option value="OK" {% if filters.status == 'OK' %}selected{% endif %}>OK</option><option value="NOK" {% if filters.status == 'NOK' %}selected{% endif %}>NOK</option></select></div>
+            <div class="filter-actions"><button type="submit" class="primary-btn">Run Analysis</button></div>
+        </form>
+    </div>
+
+    <div class="dashboard-cards">
+        <div class="metric-card metric-blue"><div class="metric-icon">▤</div><div><span>Groups</span><strong>{{ labels|length }}</strong></div></div>
+        <div class="metric-card metric-green"><div class="metric-icon">◫</div><div><span>Parts Checked</span><strong>{{ parts_checked|int }}</strong></div></div>
+        <div class="metric-card metric-red"><div class="metric-icon">!</div><div><span>NOK Records</span><strong>{{ nok_records }}</strong></div></div>
+        <div class="metric-card metric-purple"><div class="metric-icon">%</div><div><span>NOK Rate</span><strong>{{ nok_rate }}%</strong></div></div>
+    </div>
+
+    {% if labels %}
+    <div class="dashboard-grid two-column">
+        <section class="panel chart-panel"><div class="panel-header"><div><span class="section-kicker">PRODUCTION VOLUME</span><h3>Parts Checked by {{ analysis_type }}</h3></div></div><div class="chart-box analytics-chart-box"><canvas id="partsChart"></canvas></div></section>
+        <section class="panel chart-panel"><div class="panel-header"><div><span class="section-kicker">QUALITY RATE</span><h3>NOK Rate by {{ analysis_type }}</h3></div></div><div class="chart-box analytics-chart-box"><canvas id="rateChart"></canvas></div></section>
+    </div>
+
+    <section class="panel">
+        <div class="panel-header"><div><span class="section-kicker">BREAKDOWN</span><h3>{{ analysis_type }} Analysis Breakdown</h3></div><span class="muted">NOK Rate = NOK records ÷ parts checked × 100</span></div>
+        <div class="table-wrap">
+            <table class="records-table">
+                <thead><tr><th>Group</th><th>Parts Checked</th><th>NOK</th><th>NOK Rate</th></tr></thead>
+                <tbody>{% for row in breakdown %}<tr><td><strong>{{ row.group }}</strong></td><td>{{ row.parts|int }}</td><td><strong class="nok-value {% if row.nok > 0 %}nok-text{% endif %}">{{ row.nok }}</strong></td><td>{{ row.nok_rate }}%</td></tr>{% endfor %}</tbody>
+            </table>
+        </div>
+    </section>
+    {% else %}
+    <section class="panel empty-state-panel"><div class="empty-state">No Excel rows match the selected analysis filters.</div></section>
+    {% endif %}
+</div>
+
+{% if labels %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const labels = {{ labels | tojson }};
+const parts = {{ parts | tojson }};
+const rates = {{ nok_rates | tojson }};
+new Chart(document.getElementById('partsChart').getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Parts Checked', data: parts, backgroundColor: 'rgba(0,82,212,0.78)', borderRadius: 8 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
+});
+new Chart(document.getElementById('rateChart').getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'NOK Rate %', data: rates, backgroundColor: 'rgba(220,53,69,0.78)', borderRadius: 8 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: value => value + '%' } }, x: { grid: { display: false } } } }
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="auth-container">
+    <h2>Register</h2>
+
+    <!-- RULE BOX -->
+    <div class="register-rules">
+        <p><strong>Username Rules:</strong></p>
+        <ul>
+            <li>Minimum 4 characters</li>
+        </ul>
+
+        <p><strong>Password Rules:</strong></p>
+        <ul>
+            <li>Minimum 8 characters</li>
+            <li>At least 1 uppercase letter</li>
+            <li>At least 1 lowercase letter</li>
+            <li>At least 1 number</li>
+            <li>At least 1 special character</li>
+        </ul>
+    </div>
+
+    {% if error %}
+        <div class="form-error">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    <form method="post">
+
+        <input type="text" name="first_name" placeholder="First Name"
+               value="{{ form_data.first_name if form_data else '' }}" required>
+
+        <input type="text" name="last_name" placeholder="Last Name"
+               value="{{ form_data.last_name if form_data else '' }}" required>
+
+        <input type="text" name="username" placeholder="Username"
+               value="{{ form_data.username if form_data else '' }}" required>
+
+        <input type="email" name="email" placeholder="Email"
+               value="{{ form_data.email if form_data else '' }}" required>
+
+        <select name="department" required>
+            <option value="">Select Department</option>
+            <option value="Quality"
+                {% if form_data and form_data.department == "Quality" %}selected{% endif %}>
+                Quality
+            </option>
+            <option value="Production"
+                {% if form_data and form_data.department == "Production" %}selected{% endif %}>
+                Production
+            </option>
+            <option value="Maintenance"
+                {% if form_data and form_data.department == "Maintenance" %}selected{% endif %}>
+                Maintenance
+            </option>
+            <option value="Logistics"
+                {% if form_data and form_data.department == "Logistics" %}selected{% endif %}>
+                Logistics
+            </option>
+        </select>
+
+        <input type="password" name="password" placeholder="Password" required>
+
+        <input type="password" name="confirm_password" placeholder="Confirm Password" required>
+
+        <select name="role" required>
+            <option value="">Select Role</option>
+            <option value="user"
+                {% if form_data and form_data.role == "user" %}selected{% endif %}>
+                User
+            </option>
+            <option value="admin"
+                {% if form_data and form_data.role == "admin" %}selected{% endif %}>
+                Admin
+            </option>
+        </select>
+
+        <button type="submit">Register</button>
+
+    </form>
+
+    <!-- LOGIN LINK -->
+    <div class="auth-switch">
+        Already have an account?
+        <a href="/login">Login here</a>
+    </div>
+
+</div>
+
+{% endblock %}

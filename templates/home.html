@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}WSA Home{% endblock %}
+{% block content %}
+
+<div class="page-content home-page">
+    <div class="page-hero home-hero">
+        <div>
+            <div class="eyebrow">WELCOME TO WSA</div>
+            <h1>Production Quality Monitoring</h1>
+            <p>Review the live Bosch Excel data through one consistent WSA workflow: Dashboard, Records, Analytics, Observations, and Reports &amp; Export.</p>
+        </div>
+        <div class="hero-user-card">
+            <span>Signed in as</span>
+            <strong>{{ user.username|upper }}</strong>
+            <small>{{ user.role|capitalize }} access</small>
+        </div>
+    </div>
+
+    <div class="quick-actions">
+        <a href="/dashboard" class="quick-action-card"><span class="quick-action-icon">⌂</span><strong>Dashboard</strong><small>Live KPIs, trends and recent NOK records</small></a>
+        <a href="/view" class="quick-action-card"><span class="quick-action-icon">▤</span><strong>View Records</strong><small>Search and filter the master Excel records</small></a>
+        <a href="/analytics" class="quick-action-card"><span class="quick-action-icon">▥</span><strong>Analytics</strong><small>Group production and NOK metrics by Excel field</small></a>
+        <a href="/observations" class="quick-action-card"><span class="quick-action-icon">⚠</span><strong>Observations</strong><small>Review rejection and particle observations</small></a>
+        <a href="/download" class="quick-action-card"><span class="quick-action-icon">⇩</span><strong>Reports &amp; Export</strong><small>Export filtered master data to CSV</small></a>
+    </div>
+
+    <section class="panel info-panel">
+        <div class="panel-header"><div><span class="section-kicker">WORKFLOW</span><h3>WSA Excel-driven workflow</h3></div></div>
+        <div class="workflow-grid">
+            <div><span>01</span><strong>Read</strong><p>Load the current Particle Summary sheet from the Bosch Excel source.</p></div>
+            <div><span>02</span><strong>Review</strong><p>Search and filter the exact master Excel fields in View Records.</p></div>
+            <div><span>03</span><strong>Analyze</strong><p>Compare parts checked, NOK records and NOK rates by actual Excel fields.</p></div>
+            <div><span>04</span><strong>Report</strong><p>Review observations and export the filtered master data.</p></div>
+        </div>
+    </section>
+</div>
+{% endblock %}
