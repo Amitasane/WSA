@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}WSA Home{% endblock %}
+{% block title %}Investigation Dashboard - Home{% endblock %}
 {% block content %}
 
 <div class="page-content home-page">
     <div class="page-hero home-hero">
         <div>
-            <div class="eyebrow">WELCOME TO WSA</div>
-            <h1>Production Quality Monitoring</h1>
-            <p>Review the live Bosch Excel data through one consistent WSA workflow: Dashboard, Records, Analytics, Observations, and Reports &amp; Export.</p>
+            <div class="eyebrow">WELCOME TO INVESTIGATION DASHBOARD</div>
+            <h1>Common Rail Quality &amp; Defect Analysis</h1>
+            <p>Comprehensive monitoring and root-cause engineering overview powered by the master CRI &amp; CRIN rejection investigation dataset.</p>
         </div>
         <div class="hero-user-card">
             <span>Signed in as</span>
@@ -17,20 +17,61 @@
     </div>
 
     <div class="quick-actions">
-        <a href="/dashboard" class="quick-action-card"><span class="quick-action-icon">⌂</span><strong>Dashboard</strong><small>Live KPIs, trends and recent NOK records</small></a>
-        <a href="/view" class="quick-action-card"><span class="quick-action-icon">▤</span><strong>View Records</strong><small>Search and filter the master Excel records</small></a>
-        <a href="/analytics" class="quick-action-card"><span class="quick-action-icon">▥</span><strong>Analytics</strong><small>Group production and NOK metrics by Excel field</small></a>
-        <a href="/observations" class="quick-action-card"><span class="quick-action-icon">⚠</span><strong>Observations</strong><small>Review rejection and particle observations</small></a>
-        <a href="/download" class="quick-action-card"><span class="quick-action-icon">⇩</span><strong>Reports &amp; Export</strong><small>Export filtered master data to CSV</small></a>
+        <a href="/dashboard" class="quick-action-card">
+            <span class="quick-action-icon">⌂</span>
+            <strong>Dashboard</strong>
+            <small>Live KPIs, monthly trend, and defect Pareto analysis</small>
+        </a>
+        <a href="/view" class="quick-action-card">
+            <span class="quick-action-icon">▤</span>
+            <strong>View Records</strong>
+            <small>Search, sort, and filter CRI &amp; CRIN master records</small>
+        </a>
+        <a href="/analytics" class="quick-action-card">
+            <span class="quick-action-icon">▥</span>
+            <strong>Analytics</strong>
+            <small>Multi-dimensional defect rates and volume comparisons</small>
+        </a>
+        <a href="/observations" class="quick-action-card">
+            <span class="quick-action-icon">⚠</span>
+            <strong>Observations</strong>
+            <small>Detailed engineering findings and particle inspection log</small>
+        </a>
+        <a href="/download" class="quick-action-card">
+            <span class="quick-action-icon">⇩</span>
+            <strong>Reports &amp; Export</strong>
+            <small>Export filtered master records to CSV or native Excel</small>
+        </a>
     </div>
 
     <section class="panel info-panel">
-        <div class="panel-header"><div><span class="section-kicker">WORKFLOW</span><h3>WSA Excel-driven workflow</h3></div></div>
+        <div class="panel-header">
+            <div>
+                <span class="section-kicker">ENGINEERING WORKFLOW</span>
+                <h3>Investigation Analysis Workflow</h3>
+            </div>
+        </div>
         <div class="workflow-grid">
-            <div><span>01</span><strong>Read</strong><p>Load the current Particle Summary sheet from the Bosch Excel source.</p></div>
-            <div><span>02</span><strong>Review</strong><p>Search and filter the exact master Excel fields in View Records.</p></div>
-            <div><span>03</span><strong>Analyze</strong><p>Compare parts checked, NOK records and NOK rates by actual Excel fields.</p></div>
-            <div><span>04</span><strong>Report</strong><p>Review observations and export the filtered master data.</p></div>
+            <div>
+                <span>01</span>
+                <strong>Master Intake</strong>
+                <p>Read 2026 CRI (Passenger) &amp; CRIN (Commercial) complaint records from the master workbook.</p>
+            </div>
+            <div>
+                <span>02</span>
+                <strong>Detailed Inspection</strong>
+                <p>Examine technical tear-down findings, particle locations, and Julian manufacturing date codes.</p>
+            </div>
+            <div>
+                <span>03</span>
+                <strong>Pareto Analysis</strong>
+                <p>Identify major non-conformance drivers (80/20 rule) across customers and failure mechanisms.</p>
+            </div>
+            <div>
+                <span>04</span>
+                <strong>Reporting</strong>
+                <p>Generate filtered technical investigation reports and export directly to CSV or Excel.</p>
+            </div>
         </div>
     </section>
 </div>

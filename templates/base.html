@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0a1f44">
-    <title>{% block title %}WSA - Within Shift Analysis{% endblock %}</title>
+    <title>{% block title %}Investigation Dashboard{% endblock %}</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
@@ -14,19 +14,22 @@
 {% if show_header %}
 <div class="top-header">
     <div class="brand-block">
-        <img src="/static/images/logo.png" class="logo-img" alt="WSA logo">
+        <img src="/static/images/logo.png" class="logo-img" alt="Bosch logo">
         <div class="brand-copy">
-            <span class="brand-title">WSA</span>
-            <span class="brand-subtitle">Within Shift Analysis</span>
+            <span class="brand-title">Investigation</span>
+            <span class="brand-subtitle">Dashboard</span>
         </div>
     </div>
 
     <div class="title-section">
-        <span>Production Quality &amp; Audit Management</span>
+        <span>Common Rail Injector Rejection &amp; Quality Analysis</span>
     </div>
 
     {% if not hide_home_icon %}
     <div class="header-actions">
+        <a href="/refresh-data" class="header-btn" title="Reload Excel Workbook" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:6px;background:var(--blue-soft);color:var(--blue);text-decoration:none;border:1px solid rgba(0,82,212,0.2);margin-right:12px;">
+            <span>↻</span> Reload Data
+        </a>
         <a href="/" class="header-home" title="Home">
             <img src="/static/images/home.png" class="home-icon" alt="Home">
         </a>
@@ -42,8 +45,8 @@
     <aside class="sidebar">
         <div>
             <div class="sidebar-heading">
-                <span class="sidebar-heading-mark">WSA</span>
-                <div><strong>Within Shift</strong><small>Analysis</small></div>
+                <span class="sidebar-heading-mark">ID</span>
+                <div><strong>Investigation</strong><small>Dashboard</small></div>
             </div>
             <div class="sidebar-section-label">MAIN</div>
             <a href="/dashboard" class="sidebar-link {% if request.url.path == '/dashboard' %}active{% endif %}"><span class="nav-icon">⌂</span><span>Dashboard</span></a>
@@ -53,24 +56,17 @@
             <a href="/download" class="sidebar-link {% if request.url.path == '/download' %}active{% endif %}"><span class="nav-icon">⇩</span><span>Reports &amp; Export</span></a>
         </div>
         <div class="sidebar-bottom">
-            <div class="sidebar-status"><span class="status-dot"></span><div><strong>System Active</strong><small>Live Excel source</small></div></div>
+            <div class="sidebar-status"><span class="status-dot"></span><div><strong>System Active</strong><small>Investigation Excel Source</small></div></div>
             <a href="/logout" class="sidebar-link logout-link"><span class="nav-icon">↪</span><span>Logout</span></a>
         </div>
     </aside>
-      <main class="app-main">
-       <div
-    <div class="global-bosch-ribbon"
-     style="width:100%;height:24px;max-height:24px;min-height:24px;overflow:hidden;line-height:0;margin:0;padding:0;">
-
-    <img src="/static/images/bosch-ribbon.png"
-         alt="Bosch Ribbon"
-         style="display:block;width:100%;height:24px;max-height:24px;object-fit:cover;object-position:center;margin:0;padding:0;">
-
-</div>
+    <main class="app-main">
+        <div class="global-bosch-ribbon" style="width:100%;height:24px;max-height:24px;min-height:24px;overflow:hidden;line-height:0;margin:0;padding:0;">
+            <img src="/static/images/bosch-ribbon.png" alt="Bosch Ribbon" style="display:block;width:100%;height:24px;max-height:24px;object-fit:cover;object-position:center;margin:0;padding:0;">
+        </div>
 {% endif %}
 
 {% block content %}{% endblock %}
-
 
 {% if show_header and not auth_page %}
     </main>

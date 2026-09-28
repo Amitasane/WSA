@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-{% block title %}WSA Dashboard{% endblock %}
+{% block title %}Investigation Dashboard{% endblock %}
 {% block content %}
 
 <div class="page-content dashboard-page">
     <div class="page-hero">
         <div>
-            <div class="eyebrow">QUALITY MONITORING</div>
-            <h1>WSA Dashboard</h1>
-            <p>Live production-quality overview powered by the Bosch <strong>Particle Summary</strong> Excel sheet.</p>
+            <div class="eyebrow">QUALITY MONITORING &amp; ROOT-CAUSE ANALYSIS</div>
+            <h1>Investigation Dashboard</h1>
+            <p>Master overview of <strong>CRI &amp; CRIN</strong> rejection investigations, technical findings, and quality conformance.</p>
         </div>
         <div class="hero-date">
-            <span class="hero-date-label">Today</span>
-            <strong>{{ current_date }}</strong>
+            <span class="hero-date-label">Source File</span>
+            <strong style="font-size:12px;">{{ source_filename }}</strong>
         </div>
     </div>
 
@@ -19,152 +19,246 @@
     <div class="alert-card danger-alert">{{ source_error }}</div>
     {% endif %}
 
-    <section class="panel excel-panel dashboard-front-excel">
+    <!-- Filter Card -->
+    <div class="filter-card">
+        <div class="filter-heading">
+            <div>
+                <span class="section-kicker">FILTERS</span>
+                <h3>Refine Investigation Dataset</h3>
+            </div>
+            <a href="/dashboard" class="reset-btn compact">Reset All</a>
+        </div>
+        <form method="get" action="/dashboard" class="dashboard-filters">
+            <div class="filter-field">
+                <label>Product Line</label>
+                <select name="product_class">
+                    <option value="" {% if not active_filters.product_class %}selected{% endif %}>All (CRI &amp; CRIN)</option>
+                    <option value="CRI" {% if active_filters.product_class == 'CRI' %}selected{% endif %}>CRI (Passenger / Light)</option>
+                    <option value="CRIN" {% if active_filters.product_class == 'CRIN' %}selected{% endif %}>CRIN (Commercial Vehicle)</option>
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label>Month</label>
+                <select name="month">
+                    <option value="">All Months</option>
+                    {% for m in filter_options.months %}
+                    <option value="{{ m.code }}" {% if active_filters.month == m.code %}selected{% endif %}>{{ m.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label>Customer</label>
+                <select name="customer">
+                    <option value="">All Customers</option>
+                    {% for c in filter_options.customers %}
+                    <option value="{{ c }}" {% if active_filters.customer == c %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label>Complaint Type</label>
+                <select name="complaint_type">
+                    <option value="">All Types</option>
+                    {% for ct in filter_options.complaint_types %}
+                    <option value="{{ ct }}" {% if active_filters.complaint_type == ct %}selected{% endif %}>{{ ct }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label>Outcome</label>
+                <select name="outcome">
+                    <option value="">All Outcomes</option>
+                    <option value="Defect Identified" {% if active_filters.outcome == 'Defect Identified' %}selected{% endif %}>Defect Identified</option>
+                    <option value="Conforming to Specifications" {% if active_filters.outcome == 'Conforming to Specifications' %}selected{% endif %}>Conforming to Specs (OK)</option>
+                    <option value="Pending" {% if active_filters.outcome == 'Pending' %}selected{% endif %}>Pending Analysis</option>
+                </select>
+            </div>
+
+            <div class="filter-actions">
+                <button type="submit" class="primary-btn">Apply Filters</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="dashboard-cards">
+        <div class="metric-card metric-blue">
+            <div class="metric-icon">▤</div>
+            <div>
+                <span>Total Investigations</span>
+                <strong class="counter" data-target="{{ kpis.total_investigations }}">0</strong>
+                <small>Complaint cases</small>
+            </div>
+        </div>
+
+        <div class="metric-card metric-green">
+            <div class="metric-icon">◫</div>
+            <div>
+                <span>Parts Inspected</span>
+                <strong class="counter" data-target="{{ kpis.total_parts }}">0</strong>
+                <small>Total injector quantity</small>
+            </div>
+        </div>
+
+        <div class="metric-card metric-red">
+            <div class="metric-icon">!</div>
+            <div>
+                <span>Defect Cases</span>
+                <strong class="counter" data-target="{{ kpis.defect_cases }}">0</strong>
+                <small>Non-conformance identified</small>
+            </div>
+        </div>
+
+        <div class="metric-card metric-green">
+            <div class="metric-icon">✓</div>
+            <div>
+                <span>Conforming Cases</span>
+                <strong class="counter" data-target="{{ kpis.conforming_cases }}">0</strong>
+                <small>Passed Bosch specifications</small>
+            </div>
+        </div>
+
+        <div class="metric-card metric-amber">
+            <div class="metric-icon">…</div>
+            <div>
+                <span>Pending Analysis</span>
+                <strong class="counter" data-target="{{ kpis.pending }}">0</strong>
+                <small>Investigations in progress</small>
+            </div>
+        </div>
+
+        <div class="metric-card metric-purple">
+            <div class="metric-icon">%</div>
+            <div>
+                <span>Defect Rate</span>
+                <strong>{{ kpis.defect_rate }}%</strong>
+                <small>Defect cases / completed</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 1 -->
+    <div class="dashboard-grid two-column">
+        <section class="panel chart-panel">
+            <div class="panel-header">
+                <div>
+                    <span class="section-kicker">MONTHLY TREND</span>
+                    <h3>Investigations by Month</h3>
+                </div>
+            </div>
+            <div class="chart-box"><canvas id="trendChart"></canvas></div>
+        </section>
+
+        <section class="panel chart-panel">
+            <div class="panel-header">
+                <div>
+                    <span class="section-kicker">PARETO ANALYSIS</span>
+                    <h3>Top Failure Causes (80/20 Rule)</h3>
+                </div>
+            </div>
+            <div class="chart-box"><canvas id="paretoChart"></canvas></div>
+        </section>
+    </div>
+
+    <!-- Charts Row 2 -->
+    <div class="dashboard-grid two-column">
+        <section class="panel chart-panel">
+            <div class="panel-header">
+                <div>
+                    <span class="section-kicker">CUSTOMER SPREAD</span>
+                    <h3>Investigations by Customer</h3>
+                </div>
+            </div>
+            <div class="chart-box"><canvas id="customerChart"></canvas></div>
+        </section>
+
+        <section class="panel chart-panel">
+            <div class="panel-header">
+                <div>
+                    <span class="section-kicker">PRODUCT MIX</span>
+                    <h3>CRI vs CRIN Breakdown</h3>
+                </div>
+            </div>
+            <div class="chart-box"><canvas id="productShareChart"></canvas></div>
+        </section>
+    </div>
+
+    <!-- Recent Technical Findings Table -->
+    <section class="panel">
         <div class="panel-header">
             <div>
-                <span class="section-kicker">LIVE EXCEL DATA</span>
-                <h3>Particle Summary — Complete Excel Data</h3>
-                <p class="excel-description">
-                    Source: <strong>CRIN Line rejection analysis updated.xlsx</strong> &middot;
-                    Sheet: <strong>Particle Summary</strong> &middot;
-                    The complete Excel data is displayed below.
-                </p>
+                <span class="section-kicker">RECENT FINDINGS</span>
+                <h3>Latest Technical Investigations</h3>
             </div>
-            <span class="status-badge status-ok">{{ excel_total_rows }} source rows</span>
+            <a href="/view" class="text-link">View all {{ kpis.total_investigations }} records &rarr;</a>
         </div>
-        {% if excel_headers and excel_rows %}
-        <div class="excel-table-container full-excel-table-container">
-            <table class="excel-table records-table">
+        {% if recent_records %}
+        <div class="table-wrap">
+            <table class="records-table compact-table">
                 <thead>
                     <tr>
-                        {% for header in excel_headers %}
-                        <th>{{ header }}</th>
-                        {% endfor %}
+                        <th>Class</th>
+                        <th>Month</th>
+                        <th>Complaint No</th>
+                        <th>Customer</th>
+                        <th>Injector No</th>
+                        <th>Qty</th>
+                        <th>Symptom</th>
+                        <th>Technical Finding</th>
+                        <th>Outcome</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for row in excel_rows %}
+                    {% for row in recent_records %}
                     <tr>
-                        {% for value in row %}
-                        <td>{{ value }}</td>
-                        {% endfor %}
+                        <td><span class="pill-badge pill-{{ row.product_class.lower() }}">{{ row.product_class }}</span></td>
+                        <td>{{ row.month_label }}</td>
+                        <td><strong>{{ row.customer_complaint_no }}</strong></td>
+                        <td>{{ row.customer }}</td>
+                        <td><code>{{ row.injector_number }}</code></td>
+                        <td>{{ row.qty }}</td>
+                        <td>{{ row.complaint }}</td>
+                        <td style="max-width:320px; white-space:normal; font-size:12px;">{{ row.investigation_finding or 'Investigation in progress' }}</td>
+                        <td>
+                            {% if row.outcome == 'Defect Identified' %}
+                            <span class="status-badge status-nok">Defect</span>
+                            {% elif row.outcome == 'Conforming to Specifications' %}
+                            <span class="status-badge status-ok">Conforming</span>
+                            {% else %}
+                            <span class="status-badge status-pending">Pending</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
         {% else %}
-        <div class="empty-state">No Excel records available.</div>
+        <div class="empty-state">No investigation records match the selected filters.</div>
         {% endif %}
     </section>
-
-    <div class="dashboard-cards">
-
-    <div class="metric-card metric-blue">
-        <div class="metric-icon">▤</div>
-        <div>
-            <span>Total Records</span>
-            <strong class="counter" data-target="{{ total_records }}">0</strong>
-        </div>
-    </div>
-
-    <div class="metric-card metric-green">
-        <div class="metric-icon">✓</div>
-        <div>
-            <span>OK Records</span>
-            <strong class="counter" data-target="{{ ok_records }}">0</strong>
-        </div>
-    </div>
-
-    <div class="metric-card metric-purple">
-        <div class="metric-icon">…</div>
-        <div>
-            <span>Pending Records</span>
-            <strong class="counter" data-target="{{ pending_records }}">0</strong>
-        </div>
-    </div>
-
-    <div class="metric-card metric-red">
-        <div class="metric-icon">!</div>
-        <div>
-            <span>NOK Records</span>
-            <strong class="counter" data-target="{{ nok_records }}">0</strong>
-        </div>
-    </div>
-
-    <div class="metric-card metric-green">
-        <div class="metric-icon">◫</div>
-        <div>
-            <span>Parts Checked</span>
-            <strong class="counter" data-target="{{ parts_checked }}">0</strong>
-        </div>
-    </div>
-
-    <div class="metric-card metric-purple">
-        <div class="metric-icon">%</div>
-        <div>
-            <span>NOK Rate</span>
-            <strong>{{ nok_rate }}%</strong>
-            <small>Based on NOK records / parts checked</small>
-        </div>
-    </div>
-
-</div>
-
-    <div class="dashboard-grid two-column">
-        <section class="panel chart-panel">
-            <div class="panel-header"><div><span class="section-kicker">TREND</span><h3>Monthly Records vs OK vs NOK</h3></div></div>
-            <div class="chart-box"><canvas id="dailyTrendChart"></canvas></div>
-        </section>
-        <section class="panel chart-panel">
-            <div class="panel-header"><div><span class="section-kicker">SHIFT</span><h3>Shift-wise NOK</h3></div></div>
-            <div class="chart-box small-chart"><canvas id="shiftChart"></canvas></div>
-        </section>
-    </div>
-
-    <div class="dashboard-grid two-column">
-        <section class="panel chart-panel">
-            <div class="panel-header"><div><span class="section-kicker">STATION</span><h3>Station-wise NOK</h3></div></div>
-            <div class="chart-box small-chart"><canvas id="stationChart"></canvas></div>
-        </section>
-        <section class="panel">
-            <div class="panel-header"><div><span class="section-kicker">RECENT</span><h3>Recent NOK Records</h3></div><a href="/observations" class="text-link">View all</a></div>
-            {% if recent_nok %}
-            <div class="table-wrap">
-                <table class="records-table compact-table">
-                    <thead><tr><th>Date</th><th>Rejection Date</th><th>Type</th><th>Shift</th><th>Station</th><th>Customer</th></tr></thead>
-                    <tbody>{% for row in recent_nok %}<tr><td>{{ row['Date'] }}</td><td>{{ row['Rejection Date'] or '-' }}</td><td>{{ row['Type'] }}</td><td>{{ row['Shift'] }}</td><td>{{ row['Station'] }}</td><td>{{ row['Customer'] }}</td></tr>{% endfor %}</tbody>
-                </table>
-            </div>
-            {% else %}<div class="empty-state">No NOK records match the current filters.</div>{% endif %}
-        </section>
-    </div>
-
-    <section class="panel">
-        <div class="panel-header"><div><span class="section-kicker">AUDITOR ACTIVITY</span><h3>Records by Auditor</h3></div></div>
-        {% if auditor_counts %}
-        <div class="auditor-grid">
-            {% for auditor, count in auditor_counts.items() %}
-            <div class="mini-card"><div class="mini-card-title">{{ auditor }}</div><div class="mini-card-value">{{ count }}</div><div class="muted">records</div></div>
-            {% endfor %}
-        </div>
-        {% else %}<div class="empty-state">No records match the selected filters.</div>{% endif %}
-    </section>
-
 
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-window.WSA_DASHBOARD = {
-    dailyLabels: {{ daily_labels | tojson }},
-    dailyRecords: {{ daily_records | tojson }},
-    dailyOk: {{ daily_ok | tojson }},
-    dailyNok: {{ daily_nok | tojson }},
-    shiftLabels: {{ shift_labels | tojson }},
-    shiftNok: {{ shift_nok | tojson }},
-    stationLabels: {{ station_labels | tojson }},
-    stationNok: {{ station_nok | tojson }}
+window.INVESTIGATION_DASHBOARD = {
+    trendLabels: {{ trend_data.labels | tojson }},
+    trendTotal: {{ trend_data.total | tojson }},
+    trendDefect: {{ trend_data.defect | tojson }},
+    trendConforming: {{ trend_data.conforming | tojson }},
+    paretoLabels: {{ pareto_data.labels | tojson }},
+    paretoCounts: {{ pareto_data.counts | tojson }},
+    paretoCumulative: {{ pareto_data.cumulative_pct | tojson }},
+    customerLabels: {{ customer_data.labels | tojson }},
+    customerTotal: {{ customer_data.total | tojson }},
+    customerDefect: {{ customer_data.defect | tojson }},
+    productShareLabels: {{ product_share.labels | tojson }},
+    productShareCases: {{ product_share.cases | tojson }}
 };
 </script>
 <script src="/static/dashboard.js"></script>

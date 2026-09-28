@@ -1,100 +1,68 @@
 import os
-from fastapi import UploadFile, File
-from fastapi import FastAPI, Request, Depends, Form, HTTPException
+import io
+import csv
+from datetime import datetime
+from typing import Optional
+
+from fastapi import FastAPI, Request, Depends, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-from sqlalchemy import func, asc, desc
-from datetime import datetime, date
-import csv
-import io
-from openpyxl import load_workbook
 
 from backend.database import engine, Base, get_db
 from backend import models
 from backend.auth import authenticate_user, create_user, get_current_user
+from backend.investigation_loader import (
+    get_cached_investigation_data,
+    reload_investigation_data,
+    get_excel_file_path,
+)
+from backend.investigation_analytics import (
+    filter_investigation_records,
+    calculate_kpis,
+    get_monthly_trend,
+    get_pareto_defects,
+    get_customer_breakdown,
+    get_product_share,
+    get_analytics_breakdown,
+)
 
+app = FastAPI(title="Investigation Dashboard")
 
-# ================= CODE GENERATORS =================
-
-def generate_record_code(date_str, db):
-    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-    date_part = date_obj.strftime("%Y%m%d")
-
-    # Count records created on that date
-    count = db.query(models.Record).filter(
-        models.Record.date == date_obj.date()
-    ).count()
-
-    return f"NPR-{date_part}-{str(count + 1).zfill(4)}"
-
-
-def generate_case_code(case_date, db):
-    date_str = case_date.strftime("%Y%m%d")
-
-    # Get highest existing number for this date
-    last_case = db.query(models.Case).filter(
-        models.Case.case_code.like(f"NPC-{date_str}-%")
-    ).order_by(models.Case.case_code.desc()).first()
-
-    if last_case and last_case.case_code:
-        last_number = int(last_case.case_code.split("-")[-1])
-        new_number = last_number + 1
-    else:
-        new_number = 1
-
-    return f"NPC-{date_str}-{str(new_number).zfill(4)}"
-
-
-"""
-def generate_case_code(date_obj, db):
-    date_part = date_obj.strftime("%Y%m%d")
-
-    # Count cases created on that date
-    count = db.query(models.Case).filter(
-        models.Case.created_at == date_obj
-    ).count()
-
-    return f"NPC-{date_part}-{str(count + 1).zfill(4)}"
-"""
-
-
-app = FastAPI()
-
-# Serve static files
+# Static assets and template directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-Base.metadata.create_all(bind=engine)
-
 templates = Jinja2Templates(directory="templates")
 
+# Initialize database tables for authentication
+Base.metadata.create_all(bind=engine)
 
-# ================= LOGIN =================
+
+# ================= AUTHENTICATION =================
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {
         "request": request,
         "show_header": True,
-        "hide_home_icon": True
+        "hide_home_icon": True,
     })
 
 
 @app.post("/login")
-def login(request: Request,
-          username: str = Form(...),
-          password: str = Form(...),
-          db: Session = Depends(get_db)):
-
+def login(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db),
+):
     user = authenticate_user(db, username, password)
-
     if not user:
         return templates.TemplateResponse("login.html", {
             "request": request,
             "error": "Invalid username or password.",
             "show_header": True,
-            "hide_home_icon": True
+            "hide_home_icon": True,
         })
 
     response = RedirectResponse("/", status_code=302)
@@ -102,29 +70,28 @@ def login(request: Request,
     return response
 
 
-# ================= REGISTER =================
-
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
     return templates.TemplateResponse("register.html", {
         "request": request,
         "show_header": True,
-        "hide_home_icon": True
+        "hide_home_icon": True,
     })
 
 
 @app.post("/register")
-def register(request: Request,
-             first_name: str = Form(...),
-             last_name: str = Form(...),
-             username: str = Form(...),
-             email: str = Form(...),
-             password: str = Form(...),
-             confirm_password: str = Form(...),
-             department: str = Form(...),
-             role: str = Form(...),
-             db: Session = Depends(get_db)):
-
+def register(
+    request: Request,
+    first_name: str = Form(...),
+    last_name: str = Form(...),
+    username: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    confirm_password: str = Form(...),
+    department: str = Form(...),
+    role: str = Form(...),
+    db: Session = Depends(get_db),
+):
     error = create_user(
         db,
         first_name,
@@ -134,7 +101,7 @@ def register(request: Request,
         password,
         confirm_password,
         department,
-        role
+        role,
     )
 
     if error:
@@ -143,26 +110,31 @@ def register(request: Request,
             "error": error,
             "show_header": True,
             "hide_home_icon": True,
-            "form_data": {
-                "first_name": first_name,
-                "last_name": last_name,
-                "username": username,
-                "email": email,
-                "department": department,
-                "role": role
-            }
         })
 
     return RedirectResponse("/login", status_code=302)
 
 
-# ================= LOGOUT =================
-
 @app.get("/logout")
 def logout():
-    response = RedirectResponse("/login")
+    response = RedirectResponse("/login", status_code=302)
     response.delete_cookie("user_id")
     return response
+
+
+# ================= DATA RELOAD =================
+
+@app.get("/refresh-data")
+def refresh_data(request: Request):
+    """Explicitly re-reads the workbook and refreshes the in-memory cache."""
+    try:
+        get_current_user(request)
+    except Exception:
+        return RedirectResponse("/login")
+
+    reload_investigation_data()
+    referer = request.headers.get("referer") or "/dashboard"
+    return RedirectResponse(referer, status_code=302)
 
 
 # ================= HOME =================
@@ -171,1409 +143,458 @@ def logout():
 def home(request: Request):
     try:
         user = get_current_user(request)
-    except:
+    except Exception:
         return RedirectResponse("/login")
 
     return templates.TemplateResponse("home.html", {
         "request": request,
+        "show_header": True,
         "user": user,
-        "show_header": True
     })
-
-
-# ================= EXCEL DATA SOURCE =================
-
-EXCEL_SHEET = "Particle Summary"
-
-EXCEL_HEADERS = [
-    "Date",
-    "Shift",
-    "Auditor",
-    "Type",
-    "Customer",
-    "Station",
-    "Defective parts checked",
-    "Particle inside nozzle",
-    "Particle in Z hole",
-    "Particle in A hole",
-    "Total particle found",
-    "Rejection Date",
-    "Rejection Shift",
-    "Metallic/Non metallic",
-    "DA/Fresh",
-    "Chemistry",
-    "Size",
-]
-
-# Central Bosch Excel is the live source for WSA record/quality data.
-# WSA_EXCEL_FILE can be set on a workstation for local testing without changing this default.
-EXCEL_FILE = os.environ.get(
-    "WSA_EXCEL_FILE",
-    r"\\bosch.com\dfsrb\DfsIN\LOC\Na\DS\QMM\02_Projects\04_QMM3_Common\08_Projects_GAs\03_LAC\2024 - Snehal Yelmalle\CRIN Internal Rejection Analysis\CRIN Line rejection analysis updated.xlsx",
-)
-
-
-def _clean_value(value):
-    if value is None:
-        return ""
-
-    if isinstance(value, datetime):
-        return value.strftime("%d-%m-%Y")
-
-    if isinstance(value, date):
-        return value.strftime("%d-%m-%Y")
-
-    return str(value).strip()
-
-
-def _iso_date(value):
-    if value is None or value == "":
-        return ""
-
-    if isinstance(value, datetime):
-        return value.strftime("%Y-%m-%d")
-
-    if isinstance(value, date):
-        return value.strftime("%Y-%m-%d")
-
-    text = str(value).strip()
-
-    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%m/%d/%Y"):
-        try:
-            return datetime.strptime(text, fmt).strftime("%Y-%m-%d")
-        except ValueError:
-            pass
-
-    return ""
-
-
-def _as_number(value):
-    if value in (None, ""):
-        return 0.0
-
-    try:
-        return float(value)
-
-    except (TypeError, ValueError):
-
-        try:
-            return float(
-                str(value).replace(",", "").strip()
-            )
-
-        except (TypeError, ValueError):
-            return 0.0
-
-
-def _display_number(value):
-    number = _as_number(value)
-
-    if number.is_integer():
-        return int(number)
-
-    return round(number, 2)
-
-
-def load_current_excel():
-    """Load the master Particle Summary sheet fresh for every request."""
-
-    empty = {
-        "headers": EXCEL_HEADERS.copy(),
-        "rows": [],
-        "records": [],
-        "total_rows": 0,
-        "error": "",
-    }
-
-    if not os.path.exists(EXCEL_FILE):
-        empty["error"] = (
-            f"Excel source not available: {EXCEL_FILE}"
-        )
-        return empty
-
-    try:
-
-        workbook = load_workbook(
-            EXCEL_FILE,
-            data_only=True,
-            read_only=True
-        )
-
-        if EXCEL_SHEET not in workbook.sheetnames:
-
-            workbook.close()
-
-            empty["error"] = (
-                f"Sheet '{EXCEL_SHEET}' was not found in the workbook."
-            )
-
-            return empty
-
-        sheet = workbook[EXCEL_SHEET]
-
-        raw_rows = sheet.iter_rows(values_only=True)
-
-        source_header = next(raw_rows, None)
-
-        if source_header is None:
-
-            workbook.close()
-
-            return empty
-
-        header_map = {}
-
-        for idx, value in enumerate(source_header):
-            header_map[_clean_value(value)] = idx
-
-        missing = [
-            h for h in EXCEL_HEADERS
-            if h not in header_map
-        ]
-
-        if missing:
-
-            workbook.close()
-
-            empty["error"] = (
-                "Missing required Excel columns: "
-                + ", ".join(missing)
-            )
-
-            return empty
-
-        records = []
-        rows = []
-
-        for raw in raw_rows:
-
-            values = []
-
-            for header in EXCEL_HEADERS:
-
-                idx = header_map[header]
-
-                values.append(
-                    raw[idx] if idx < len(raw) else None
-                )
-
-            if not any(_clean_value(v) for v in values):
-                continue
-
-            record = {
-                header: _clean_value(values[i])
-                for i, header in enumerate(EXCEL_HEADERS)
-            }
-
-            record["_date_iso"] = _iso_date(
-                values[0]
-            )
-
-            record["_rejection_date_iso"] = _iso_date(
-                values[11]
-            )
-
-            record["_parts"] = _as_number(
-                values[6]
-            )
-
-            record["_total_particle"] = _as_number(
-                values[10]
-            )
-
-            # Business rule:
-            # Total particle found = 0 -> OK
-            # Total particle found > 0 -> NOK
-            # Total particle found blank -> PENDING
-
-            particle_value = values[10]
-
-            if particle_value in (None, ""):
-                record["status"] = "PENDING"
-            else:
-                total_particle = _as_number(particle_value)
-
-                if total_particle == 0:
-                    record["status"] = "OK"
-                else:
-                    record["status"] = "NOK"
-
-            record["status_label"] = record["status"]
-            row = record.copy()
-
-            row.pop("_date_iso", None)
-            row.pop("_rejection_date_iso", None)
-            row.pop("_parts", None)
-            row.pop("_total_particle", None)
-            row.pop("status_label", None)
-
-            rows.append(
-                [record[h] for h in EXCEL_HEADERS]
-            )
-
-            records.append(record)
-
-        workbook.close()
-
-        return {
-            "headers": EXCEL_HEADERS.copy(),
-            "rows": rows,
-            "records": records,
-            "total_rows": len(records),
-            "error": "",
-        }
-
-    except Exception as exc:
-
-        try:
-            workbook.close()
-        except Exception:
-            pass
-
-        empty["error"] = (
-            f"Unable to read Excel source: {exc}"
-        )
-
-        return empty
-
-
-def filter_excel_records(
-    records,
-    from_date=None,
-    to_date=None,
-    shift=None,
-    auditor=None,
-    analysis_field=None,
-    analysis_value=None,
-    status=None,
-    rejection_shift=None,
-    station=None,
-    customer=None,
-    record_type=None,
-    metallic=None,
-    da_fresh=None,
-    chemistry=None,
-    size=None,
-    search=None
-):
-
-    result = []
-
-    for record in records:
-
-        if (
-            from_date
-            and record.get("_date_iso", "") < from_date
-        ):
-            continue
-
-        if (
-            to_date
-            and record.get("_date_iso", "") > to_date
-        ):
-            continue
-
-        if (
-            shift
-            and record.get("Shift") != shift
-        ):
-            continue
-
-        if (
-            auditor
-            and record.get("Auditor") != auditor
-        ):
-            continue
-
-        if (
-            analysis_field
-            and analysis_value
-            and record.get(analysis_field) != analysis_value
-        ):
-            continue
-
-        if (
-            status
-            and status != "All"
-            and record.get("status") != status
-        ):
-            continue
-
-        if (
-            rejection_shift
-            and record.get("Rejection Shift") != rejection_shift
-        ):
-            continue
-
-        if (
-            station
-            and record.get("Station") != station
-        ):
-            continue
-
-        if (
-            customer
-            and record.get("Customer") != customer
-        ):
-            continue
-
-        if (
-            record_type
-            and record.get("Type") != record_type
-        ):
-            continue
-
-        if (
-            metallic
-            and record.get("Metallic/Non metallic") != metallic
-        ):
-            continue
-
-        if (
-            da_fresh
-            and record.get("DA/Fresh") != da_fresh
-        ):
-            continue
-
-        if (
-            chemistry
-            and record.get("Chemistry") != chemistry
-        ):
-            continue
-
-        if (
-            size
-            and record.get("Size") != size
-        ):
-            continue
-
-        if search:
-
-            needle = search.strip().lower()
-
-            haystack = " ".join(
-                str(record.get(h, ""))
-                for h in EXCEL_HEADERS
-            ).lower()
-
-            if needle not in haystack:
-                continue
-
-        result.append(record)
-
-    return result
-
-SHIFT_ORDER = ["1st", "Gen", "2nd", "3rd"]
-def excel_filter_options(records):
-    fields = [
-        "Shift",
-        "Auditor",
-        "Type",
-        "Customer",
-        "Station",
-        "Rejection Shift",
-        "Metallic/Non metallic",
-        "DA/Fresh",
-        "Chemistry",
-        "Size",
-    ]
-
-    options = {
-        field: sorted({
-            str(r.get(field, "")).strip()
-            for r in records
-            if str(r.get(field, "")).strip()
-        })
-        for field in fields
-    }
-
-    # Required shift order
-    options["Shift"] = (
-        [shift for shift in SHIFT_ORDER if shift in options["Shift"]]
-        + [
-            shift
-            for shift in options["Shift"]
-            if shift not in SHIFT_ORDER
-        ]
-    )
-
-    return options
-
-
-def excel_metrics(records):
-    total_records = len(records)
-
-    ok_records = sum(
-        1
-        for r in records
-        if r.get("status") == "OK"
-    )
-
-    pending_records = sum(
-        1
-        for r in records
-        if r.get("status") == "PENDING"
-    )
-
-    nok_records = sum(
-        1
-        for r in records
-        if r.get("status") == "NOK"
-    )
-
-    parts_checked = sum(
-        r.get("_parts", 0)
-        for r in records
-    )
-
-    total_particles = sum(
-        r.get("_total_particle", 0)
-        for r in records
-    )
-
-    nok_rate = round(
-        (nok_records / parts_checked) * 100,
-        2
-    ) if parts_checked else 0
-
-    return {
-        "total_records": total_records,
-        "ok_records": ok_records,
-        "pending_records": pending_records,
-        "nok_records": nok_records,
-        "parts_checked": _display_number(parts_checked),
-        "total_particles": _display_number(total_particles),
-        "nok_rate": nok_rate,
-    }
-
-def _group_counts(records, field):
-
-    grouped = {}
-
-    for record in records:
-
-        key = record.get(field) or "Unknown"
-
-        item = grouped.setdefault(
-            key,
-            {
-                "parts": 0,
-                "nok": 0
-            }
-        )
-
-        item["parts"] += record.get(
-            "_parts",
-            0
-        )
-
-        if record.get("status") == "NOK":
-            item["nok"] += 1
-
-    keys = list(grouped.keys())
-
-    return (
-        keys,
-
-        [
-            _display_number(
-                grouped[k]["parts"]
-            )
-            for k in keys
-        ],
-
-        [
-            grouped[k]["nok"]
-            for k in keys
-        ],
-
-        [
-            round(
-                (
-                    grouped[k]["nok"]
-                    /
-                    grouped[k]["parts"]
-                    *
-                    100
-                ),
-                2
-            )
-            if grouped[k]["parts"]
-            else 0
-            for k in keys
-        ],
-
-        grouped,
-    )
 
 
 # ================= DASHBOARD =================
 
-@app.get(
-    "/dashboard",
-    response_class=HTMLResponse
-)
+@app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(
     request: Request,
-    from_date: str = None,
-    to_date: str = None,
-    shift: str = None,
-    auditor: str = None,
-    type: str = None
+    product_class: Optional[str] = Query(None),
+    month: Optional[str] = Query(None),
+    customer: Optional[str] = Query(None),
+    complaint_type: Optional[str] = Query(None),
+    outcome: Optional[str] = Query(None),
 ):
-
     try:
-
         user = get_current_user(request)
-
     except Exception:
-
         return RedirectResponse("/login")
 
-    data = load_current_excel()
+    data = get_cached_investigation_data()
+    all_records = data["records"]
 
-    records = filter_excel_records(
-        data["records"],
-        from_date,
-        to_date,
-        shift=shift,
-        auditor=auditor,
-        record_type=type
+    # Apply filters
+    filtered_records = filter_investigation_records(
+        all_records,
+        product_class=product_class,
+        month=month,
+        customer=customer,
+        complaint_type=complaint_type,
+        outcome=outcome,
     )
 
-    metrics = excel_metrics(records)
-
-    options = excel_filter_options(
-        data["records"]
-    )
-
-
-    # ================= MONTHLY RECORDS VS NOK =================
-
-    monthly = {}
-
-    for record in records:
-
-        date_value = (
-            record.get("_date_iso")
-            or "Unknown"
-        )
-
-        if date_value != "Unknown":
-
-            month_key = str(
-                date_value
-            )[:7]
-
-        else:
-
-            month_key = "Unknown"
-
-        monthly.setdefault(
-    month_key,
-    {
-        "records": 0,
-        "ok": 0,
-        "nok": 0,
-        "pending": 0
-    }
-)
-
-       # Count total records by status
-
-        monthly[month_key]["records"] += 1
-
-        if record.get("status") == "NOK":
-            monthly[month_key]["nok"] += 1
-
-        elif record.get("status") == "PENDING":
-            monthly[month_key]["pending"] += 1
-
-        elif record.get("status") == "OK":
-            monthly[month_key]["ok"] += 1
-
-
-    # ================= SORT MONTHS =================
-
-    monthly_keys = sorted(
-        monthly.keys()
-    )
-
-
-    # ================= MONTH LABELS =================
-
-    month_names = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec"
-    ]
-
-    monthly_labels = []
-
-    for key in monthly_keys:
-
-        if key == "Unknown":
-
-            monthly_labels.append(
-                "Unknown"
-            )
-
-        else:
-
-            year = key[:4]
-
-            month = key[5:7]
-
-            try:
-
-                month_name = month_names[
-                    int(month) - 1
-                ]
-
-                monthly_labels.append(
-                    f"{month_name} {year}"
-                )
-
-            except (
-                ValueError,
-                IndexError
-            ):
-
-                monthly_labels.append(
-                    key
-                )
-
-
-    # ================= MONTHLY RECORD VALUES =================
-
-    monthly_records = [
-        monthly[key]["records"]
-        for key in monthly_keys
-    ]
-
-
-    # ================= MONTHLY NOK VALUES =================
-
-    monthly_nok = [
-        monthly[key]["nok"]
-        for key in monthly_keys
-    ]
-    monthly_ok = [
-    monthly[key]["ok"]
-    for key in monthly_keys
-]
-    
-
-
-    # ================= SHIFT-WISE NOK =================
-
-    shift_nok = {}
-
-    for record in records:
-
-        key = (
-            record.get("Shift")
-            or "Unknown"
-        )
-
-        shift_nok[key] = (
-            shift_nok.get(key, 0)
-            +
-            (
-                1
-                if record.get("status") == "NOK"
-                else 0
-            )
-        )
-
-
-    # ================= STATION-WISE NOK =================
-
-        # ================= STATION-WISE NOK =================
-
-    station_nok = {}
-
-    for record in records:
-        if record.get("status") != "NOK":
-            continue
-
-        key = (
-            record.get("Station")
-            or "Unknown"
-        )
-
-        station_nok[key] = station_nok.get(key, 0) + 1
-
-
-    # ================= AUDITOR COUNTS =================
-
-    auditor_counts = {}
-
-    for record in records:
-
-        key = (
-            record.get("Auditor")
-            or "Unknown"
-        )
-
-        auditor_counts[key] = (
-            auditor_counts.get(key, 0)
-            + 1
-        )
-
-
-    auditor_counts = dict(
-        sorted(
-            auditor_counts.items(),
-            key=lambda item: (
-                -item[1],
-                item[0]
-            )
-        )
-    )
-
-
-    # ================= RECENT NOK =================
-
-    recent_nok = [
-        record
-        for record in records
-        if record.get("status") == "NOK"
-    ]
-
-    recent_nok.sort(
-        key=lambda record: (
-            record.get(
-                "_rejection_date_iso"
-            )
-            or record.get(
-                "_date_iso"
-            )
-            or ""
-        ),
-        reverse=True
-    )
-
-
-    # ================= SEND DATA TO DASHBOARD =================
-
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": request,
-
-            "user": user,
-
-            "current_date": date.today().strftime(
-                "%d %b %Y"
-            ),
-
-            **metrics,
-
-            "filters": {
-                "from_date": from_date,
-                "to_date": to_date,
-                "shift": shift,
-                "auditor": auditor,
-                "type": type
-            },
-
-            "shifts": options["Shift"],
-
-            "auditors": options["Auditor"],
-
-            "types": options["Type"],
-
-            # Kept with the existing names so
-            # dashboard.js does not need another
-            # backend variable-name change.
-
-            "daily_labels": monthly_labels,
-
-            "daily_records": monthly_records,
-
-            "daily_nok": monthly_nok,
-            "daily_ok": monthly_ok,
-
-            "shift_labels": list(
-                shift_nok.keys()
-            ),
-
-            "shift_nok": list(
-                shift_nok.values()
-            ),
-
-            "station_labels": list(
-                station_nok.keys()
-            ),
-
-            "station_nok": list(
-                station_nok.values()
-            ),
-
-            "auditor_counts": auditor_counts,
-
-            "recent_nok": recent_nok[:8],
-
-            "excel_headers": data["headers"],
-
-            "excel_rows": [
-                [
-                    record[h]
-                    for h in EXCEL_HEADERS
-                ]
-                for record in data["records"]
-            ],
-
-            "excel_total_rows": (
-                data["total_rows"]
-            ),
-
-            "source_error": data["error"],
-
-            "show_header": True
-        }
-    )
-
-
-# ================= RECORD ENTRY =================
-
-# Record creation/editing is intentionally disabled
-# in the Excel-driven WSA version.
-# The live Bosch workbook remains the single source
-# for record data.
+    # Compute quality metrics and chart datasets
+    kpis = calculate_kpis(filtered_records)
+    trend_data = get_monthly_trend(filtered_records)
+    pareto_data = get_pareto_defects(filtered_records)
+    customer_data = get_customer_breakdown(filtered_records, limit=10)
+    product_share = get_product_share(filtered_records)
+
+    # Recent 10 technical investigations
+    recent_records = filtered_records[:10]
+
+    source_path = get_excel_file_path()
+    source_filename = os.path.basename(source_path)
+
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "show_header": True,
+        "user": user,
+        "source_filename": source_filename,
+        "source_error": data["error"],
+        "kpis": kpis,
+        "trend_data": trend_data,
+        "pareto_data": pareto_data,
+        "customer_data": customer_data,
+        "product_share": product_share,
+        "recent_records": recent_records,
+        "active_filters": {
+            "product_class": product_class,
+            "month": month,
+            "customer": customer,
+            "complaint_type": complaint_type,
+            "outcome": outcome,
+        },
+        "filter_options": {
+            "months": data["months"],
+            "customers": data["customers"],
+            "complaint_types": data["complaint_types"],
+        },
+    })
 
 
 # ================= VIEW RECORDS =================
 
-@app.get(
-    "/view",
-    response_class=HTMLResponse
-)
+@app.get("/view", response_class=HTMLResponse)
 def view_records(
     request: Request,
-    from_date: str = None,
-    to_date: str = None,
-    shift: str = None,
-    auditor: str = None,
-    type: str = None,
-    status: str = None,
-    sort_by: str = "date",
-    order: str = "desc",
-    search: str = None
+    product_class: Optional[str] = Query(None),
+    month: Optional[str] = Query(None),
+    customer: Optional[str] = Query(None),
+    complaint_type: Optional[str] = Query(None),
+    outcome: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=10, le=100),
 ):
-
     try:
-
         user = get_current_user(request)
-
     except Exception:
-
         return RedirectResponse("/login")
 
-    data = load_current_excel()
+    data = get_cached_investigation_data()
+    all_records = data["records"]
 
-    records = filter_excel_records(
-        data["records"],
-        from_date,
-        to_date,
-        shift=shift,
-        auditor=auditor,
-        record_type=type,
-        status=status,
-        search=search
+    filtered = filter_investigation_records(
+        all_records,
+        product_class=product_class,
+        month=month,
+        customer=customer,
+        complaint_type=complaint_type,
+        outcome=outcome,
+        search=search,
     )
 
-    sort_map = {
-        "date": "_date_iso",
-        "rejection_date": "_rejection_date_iso",
-        "parts": "_parts",
-        "particles": "_total_particle",
-        "auditor": "Auditor",
-        "shift": "Shift",
-        "station": "Station",
-    }
+    total_filtered = len(filtered)
+    total_pages = max(1, (total_filtered + page_size - 1) // page_size)
+    current_page = min(page, total_pages)
 
-    key = sort_map.get(
-        sort_by,
-        "_date_iso"
-    )
+    start_idx = (current_page - 1) * page_size
+    end_idx = start_idx + page_size
+    paged_records = filtered[start_idx:end_idx]
 
-    records.sort(
-        key=lambda r: (
-            r.get(key) or ""
-        ),
-        reverse=(
-            order == "desc"
-        )
-    )
-
-    metrics = excel_metrics(
-        records
-    )
-
-    options = excel_filter_options(
-        data["records"]
-    )
-
-    return templates.TemplateResponse(
-        "view_records.html",
-        {
-            "request": request,
-
-            "user": user,
-
-            "records": records,
-
-            **metrics,
-
-            "options": options,
-
-            "filters": {
-                "from_date": from_date,
-                "to_date": to_date,
-                "shift": shift,
-                "auditor": auditor,
-                "type": type,
-                "status": status,
-                "sort_by": sort_by,
-                "order": order,
-                "search": search,
-            },
-
-            "headers": EXCEL_HEADERS,
-
-            "source_error": data["error"],
-
-            "show_header": True
-        }
-    )
-
-
-# ================= REPORTS & EXPORT =================
-
-@app.get(
-    "/download",
-    response_class=HTMLResponse
-)
-def download_page(request: Request):
-
-    try:
-
-        get_current_user(request)
-
-    except Exception:
-
-        return RedirectResponse("/login")
-
-    data = load_current_excel()
-
-    return templates.TemplateResponse(
-        "download.html",
-        {
-            "request": request,
-
-            "user": get_current_user(
-                request
-            ),
-
-            "total_rows": data["total_rows"],
-
-            "source_error": data["error"],
-
-            "show_header": True
-        }
-    )
-
-
-@app.post("/download")
-def download_csv(
-    request: Request,
-    from_date: str = Form(None),
-    to_date: str = Form(None),
-    status: str = Form("All")
-):
-
-    try:
-
-        get_current_user(request)
-
-    except Exception:
-
-        return RedirectResponse("/login")
-
-    data = load_current_excel()
-
-    records = filter_excel_records(
-        data["records"],
-        from_date,
-        to_date,
-        status=status
-    )
-
-    output = io.StringIO()
-
-    writer = csv.writer(
-        output
-    )
-
-    writer.writerow(
-        EXCEL_HEADERS + ["Status"]
-    )
-
-    for record in records:
-
-        writer.writerow(
-            [
-                record.get(
-                    h,
-                    ""
-                )
-                for h in EXCEL_HEADERS
-            ]
-            +
-            [
-                record.get(
-                    "status",
-                    ""
-                )
-            ]
-        )
-
-    output.seek(0)
-
-    filename = (
-        "wsa_excel_records.csv"
-    )
-
-    return StreamingResponse(
-        iter(
-            [
-                output.getvalue()
-            ]
-        ),
-        media_type="text/csv; charset=utf-8",
-
-        headers={
-            "Content-Disposition":
-                f"attachment; filename={filename}"
-        }
-    )
+    return templates.TemplateResponse("view_records.html", {
+        "request": request,
+        "show_header": True,
+        "user": user,
+        "records": paged_records,
+        "total_filtered": total_filtered,
+        "total_unfiltered": len(all_records),
+        "current_page": current_page,
+        "total_pages": total_pages,
+        "page_size": page_size,
+        "source_error": data["error"],
+        "filters": {
+            "product_class": product_class,
+            "month": month,
+            "customer": customer,
+            "complaint_type": complaint_type,
+            "outcome": outcome,
+            "search": search,
+        },
+        "filter_options": {
+            "months": data["months"],
+            "customers": data["customers"],
+            "complaint_types": data["complaint_types"],
+        },
+    })
 
 
 # ================= ANALYTICS =================
 
-ANALYSIS_FIELDS = [
-    "Shift",
-    "Auditor",
-    "Type",
+AVAILABLE_DIMENSIONS = [
     "Customer",
-    "Station",
-    "Rejection Shift",
-    "Metallic/Non metallic",
-    "DA/Fresh",
-    "Chemistry",
-    "Size"
+    "Defect Category",
+    "Complaint Type",
+    "Product Line",
+    "Month",
+    "Injector Part Number",
+    "Plant",
+    "Responsibility",
 ]
 
-
-@app.get(
-    "/analytics",
-    response_class=HTMLResponse
-)
+@app.get("/analytics", response_class=HTMLResponse)
 def analytics_page(
     request: Request,
-    analysis_type: str = "Shift",
-    from_date: str = None,
-    to_date: str = None,
-    shift: str = None,
-    status: str = None
+    group_by: str = Query("Customer"),
+    product_class: Optional[str] = Query(None),
+    month: Optional[str] = Query(None),
+    complaint_type: Optional[str] = Query(None),
 ):
-
     try:
-
         user = get_current_user(request)
-
     except Exception:
-
         return RedirectResponse("/login")
 
-    if analysis_type not in ANALYSIS_FIELDS:
+    data = get_cached_investigation_data()
+    all_records = data["records"]
 
-        analysis_type = "Shift"
-
-    data = load_current_excel()
-
-    records = filter_excel_records(
-        data["records"],
-        from_date,
-        to_date,
-        shift=shift,
-        status=status
+    filtered = filter_investigation_records(
+        all_records,
+        product_class=product_class,
+        month=month,
+        complaint_type=complaint_type,
     )
 
-    labels, parts, nok, nok_rates, grouped = (
-        _group_counts(
-            records,
-            analysis_type
-        )
-    )
+    kpis = calculate_kpis(filtered)
+    analytics_breakdown = get_analytics_breakdown(filtered, group_by=group_by)
 
-    metrics = excel_metrics(
-        records
-    )
-
-    options = excel_filter_options(
-        data["records"]
-    )
-
-    breakdown = []
-
-    for label in labels:
-
-        breakdown.append(
-            {
-                "group": label,
-
-                "parts": grouped[label]["parts"],
-
-                "nok": grouped[label]["nok"],
-
-                "nok_rate": round(
-                    (
-                        grouped[label]["nok"]
-                        /
-                        grouped[label]["parts"]
-                        *
-                        100
-                    ),
-                    2
-                )
-                if grouped[label]["parts"]
-                else 0,
-            }
-        )
-
-    breakdown.sort(
-        key=lambda item: (
-            -item["nok"],
-            str(item["group"])
-        )
-    )
-
-    return templates.TemplateResponse(
-        "analytics.html",
-        {
-            "request": request,
-
-            "user": user,
-
-            "analysis_fields": ANALYSIS_FIELDS,
-
-            "analysis_type": analysis_type,
-
-            "labels": labels,
-
-            "parts": parts,
-
-            "nok": nok,
-
-            "nok_rates": nok_rates,
-
-            "breakdown": breakdown,
-
-            **metrics,
-
-            "options": options,
-
-            "filters": {
-                "from_date": from_date,
-                "to_date": to_date,
-                "shift": shift,
-                "status": status
-            },
-
-            "source_error": data["error"],
-
-            "show_header": True
-        }
-    )
+    return templates.TemplateResponse("analytics.html", {
+        "request": request,
+        "show_header": True,
+        "user": user,
+        "source_error": data["error"],
+        "active_group_by": group_by,
+        "available_dimensions": AVAILABLE_DIMENSIONS,
+        "kpis": kpis,
+        "analytics_data": analytics_breakdown,
+        "filters": {
+            "product_class": product_class,
+            "month": month,
+            "complaint_type": complaint_type,
+        },
+        "filter_options": {
+            "months": data["months"],
+            "complaint_types": data["complaint_types"],
+        },
+    })
 
 
-@app.post(
-    "/analytics",
-    response_class=HTMLResponse
-)
-def analytics_data(
+@app.post("/analytics")
+def analytics_post(
     request: Request,
-    analysis_type: str = Form(...),
-    from_date: str = Form(None),
-    to_date: str = Form(None),
-    shift: str = Form(None),
-    status: str = Form(None)
+    group_by: str = Form("Customer"),
+    product_class: Optional[str] = Form(None),
+    month: Optional[str] = Form(None),
+    complaint_type: Optional[str] = Form(None),
 ):
-
-    params = [
-        f"analysis_type={analysis_type}"
-    ]
-
-    if from_date:
-        params.append(
-            f"from_date={from_date}"
-        )
-
-    if to_date:
-        params.append(
-            f"to_date={to_date}"
-        )
-
-    if shift:
-        params.append(
-            f"shift={shift}"
-        )
-
-    if status:
-        params.append(
-            f"status={status}"
-        )
-
-    return RedirectResponse(
-        "/analytics?" + "&".join(params),
-        status_code=303
-    )
+    query_params = []
+    if group_by:
+        query_params.append(f"group_by={group_by}")
+    if product_class:
+        query_params.append(f"product_class={product_class}")
+    if month:
+        query_params.append(f"month={month}")
+    if complaint_type:
+        query_params.append(f"complaint_type={complaint_type}")
+    
+    url = "/analytics"
+    if query_params:
+        url += "?" + "&".join(query_params)
+    return RedirectResponse(url, status_code=302)
 
 
 # ================= OBSERVATIONS =================
 
-@app.get(
-    "/observations",
-    response_class=HTMLResponse
-)
+@app.get("/observations", response_class=HTMLResponse)
 def observations(
     request: Request,
-    from_date: str = None,
-    to_date: str = None,
-    shift: str = None,
-    auditor: str = None,
-    type: str = None,
-    status: str = "NOK",
-    rejection_shift: str = None,
-    station: str = None,
-    customer: str = None,
-    metallic: str = None,
-    da_fresh: str = None,
-    chemistry: str = None,
-    size: str = None,
-    search: str = None
+    search: Optional[str] = Query(None),
+    defect_category: Optional[str] = Query(None),
+    product_class: Optional[str] = Query(None),
+    customer: Optional[str] = Query(None),
 ):
-
     try:
-
         user = get_current_user(request)
-
     except Exception:
-
         return RedirectResponse("/login")
 
-    data = load_current_excel()
+    data = get_cached_investigation_data()
+    all_records = data["records"]
 
-    records = filter_excel_records(
-        data["records"],
-        from_date,
-        to_date,
-        shift=shift,
-        auditor=auditor,
-        record_type=type,
-        status=status,
-        rejection_shift=rejection_shift,
-        station=station,
+    filtered = filter_investigation_records(
+        all_records,
+        search=search,
+        defect_category=defect_category,
+        product_class=product_class,
         customer=customer,
-        metallic=metallic,
-        da_fresh=da_fresh,
-        chemistry=chemistry,
-        size=size,
-        search=search
     )
 
-    records.sort(
-        key=lambda r: (
-            r.get(
-                "_rejection_date_iso"
-            )
-            or r.get(
-                "_date_iso"
-            )
-            or ""
-        ),
-        reverse=True
+    kpis = calculate_kpis(filtered)
+    particle_findings = sum(
+        1 for r in filtered
+        if "particle" in r["defect_category"].lower() or r["particle_location"]
     )
 
-    metrics = excel_metrics(
-        records
+    return templates.TemplateResponse("observations.html", {
+        "request": request,
+        "show_header": True,
+        "user": user,
+        "source_error": data["error"],
+        "observations": filtered,
+        "total_observations": len(filtered),
+        "kpis": kpis,
+        "particle_findings": particle_findings,
+        "filters": {
+            "search": search,
+            "defect_category": defect_category,
+            "product_class": product_class,
+            "customer": customer,
+        },
+        "filter_options": {
+            "defect_categories": data["defect_categories"],
+            "customers": data["customers"],
+        },
+    })
+
+
+# ================= REPORTS & EXPORT =================
+
+@app.get("/download", response_class=HTMLResponse)
+def download_page(request: Request):
+    try:
+        user = get_current_user(request)
+    except Exception:
+        return RedirectResponse("/login")
+
+    data = get_cached_investigation_data()
+    source_filename = os.path.basename(get_excel_file_path())
+
+    return templates.TemplateResponse("download.html", {
+        "request": request,
+        "show_header": True,
+        "user": user,
+        "total_rows": data["total_records"],
+        "source_filename": source_filename,
+        "source_error": data["error"],
+        "filter_options": {
+            "months": data["months"],
+            "customers": data["customers"],
+            "complaint_types": data["complaint_types"],
+        },
+    })
+
+
+@app.post("/download")
+def download_file(
+    request: Request,
+    format: str = Form("csv"),
+    product_class: str = Form("All"),
+    month: str = Form("All"),
+    customer: str = Form("All"),
+    complaint_type: str = Form("All"),
+    outcome: str = Form("All"),
+):
+    try:
+        get_current_user(request)
+    except Exception:
+        return RedirectResponse("/login")
+
+    data = get_cached_investigation_data()
+    filtered = filter_investigation_records(
+        data["records"],
+        product_class=product_class,
+        month=month,
+        customer=customer,
+        complaint_type=complaint_type,
+        outcome=outcome,
     )
 
-    options = excel_filter_options(
-        data["records"]
-    )
+    export_headers = [
+        "Product Class",
+        "Month Code",
+        "Month Label",
+        "Customer Complaint No",
+        "Customer",
+        "Complaint Type",
+        "Injector Part Number",
+        "Quantity",
+        "Reported Complaint",
+        "Technical Finding",
+        "Defect Category",
+        "Quality Outcome",
+        "Investigation Status",
+        "Serial Number",
+        "MFD Code",
+        "Vehicle Mileage",
+        "QC Notification No",
+        "ESN",
+        "Particle Location",
+        "Responsibility",
+        "Manufacturing Plant",
+        "For Analysis",
+    ]
 
-    particle_rows = sum(
-        1
-        for r in records
-        if r.get(
-            "_total_particle",
-            0
-        ) > 0
-    )
+    export_rows = []
+    for r in filtered:
+        export_rows.append([
+            r["product_class"],
+            r["month_code"],
+            r["month_label"],
+            r["customer_complaint_no"],
+            r["customer"],
+            r["complaint_type"],
+            r["injector_number"],
+            r["qty"],
+            r["complaint"],
+            r["investigation_finding"],
+            r["defect_category"],
+            r["outcome"],
+            r["status"],
+            r["serial_no"],
+            r["mfd"],
+            r["mileage"],
+            r["qc_number"],
+            r["esn"],
+            r["particle_location"],
+            r["responsibility"],
+            r["mfg_plant"],
+            r["for_analysis"],
+        ])
 
-    return templates.TemplateResponse(
-        "observations.html",
-        {
-            "request": request,
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-            "user": user,
+    if format.lower() == "xlsx":
+        # Native Excel export using openpyxl
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
-            "records": records,
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Investigations Export"
 
-            "headers": EXCEL_HEADERS,
+        header_font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="0A1F44", end_color="0A1F44", fill_type="solid")
+        thin_border = Border(
+            left=Side(style='thin', color='E0E0E0'),
+            right=Side(style='thin', color='E0E0E0'),
+            top=Side(style='thin', color='E0E0E0'),
+            bottom=Side(style='thin', color='E0E0E0')
+        )
 
-            "particle_rows": particle_rows,
+        ws.append(export_headers)
+        for col_idx in range(1, len(export_headers) + 1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center", vertical="center")
 
-            **metrics,
+        data_font = Font(name="Segoe UI", size=10)
+        for row_data in export_rows:
+            ws.append(row_data)
+            current_row = ws.max_row
+            for col_idx in range(1, len(row_data) + 1):
+                cell = ws.cell(row=current_row, column=col_idx)
+                cell.font = data_font
+                cell.border = thin_border
 
-            "options": options,
+        # Auto-adjust column widths
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = col[0].column_letter
+            ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
 
-            "filters": {
-                "from_date": from_date,
-                "to_date": to_date,
-                "shift": shift,
-                "auditor": auditor,
-                "type": type,
-                "status": status,
-                "rejection_shift": rejection_shift,
-                "station": station,
-                "customer": customer,
-                "metallic": metallic,
-                "da_fresh": da_fresh,
-                "chemistry": chemistry,
-                "size": size,
-                "search": search,
-            },
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
 
-            "source_error": data["error"],
+        filename = f"investigation_records_{timestamp}.xlsx"
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
 
-            "show_header": True
-        }
-    )
+    else:
+        # CSV Export
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(export_headers)
+        writer.writerows(export_rows)
 
-
-# Legacy database CRUD/case/debug endpoints
-# were removed from the Excel-driven web workflow.
+        output.seek(0)
+        filename = f"investigation_records_{timestamp}.csv"
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )

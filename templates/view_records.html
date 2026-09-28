@@ -1,134 +1,205 @@
 {% extends "base.html" %}
-{% block title %}WSA View Records{% endblock %}
+{% block title %}Investigation Records{% endblock %}
 {% block content %}
 
 <div class="page-content">
     <div class="page-hero compact-hero">
         <div>
-            <div class="eyebrow">EXCEL RECORDS</div>
-            <h1>View Records</h1>
-            <p>All record data is loaded directly from the live <strong>Particle Summary</strong> sheet.</p>
+            <div class="eyebrow">MASTER DATA AUDIT</div>
+            <h1>Investigation Records</h1>
+            <p>Comprehensive tabular view of CRI and CRIN complaint records, technical findings, and quality statuses.</p>
         </div>
-        <div class="hero-stat"><strong>{{ total_records }}</strong><span>visible records</span></div>
+        <div class="hero-stat">
+            <strong>{{ total_filtered }}</strong>
+            <span>of {{ total_unfiltered }} records</span>
+        </div>
     </div>
 
-    {% if source_error %}<div class="alert-card danger-alert">{{ source_error }}</div>{% endif %}
+    {% if source_error %}
+    <div class="alert-card danger-alert">{{ source_error }}</div>
+    {% endif %}
 
-    <div class="dashboard-cards">
-        <div class="metric-card metric-blue"><div class="metric-icon">▤</div><div><span>Total Records</span><strong class="counter" data-target="{{ total_records }}">0</strong></div></div>
-<div class="metric-card metric-green"><div class="metric-icon">✓</div><div><span>Pending Records</span><strong class="counter" data-target="{{ pending_records }}">0</strong></div></div>        <div class="metric-card metric-red"><div class="metric-icon">!</div><div><span>NOK Records</span><strong class="counter" data-target="{{ nok_records }}">0</strong></div></div>
-        <div class="metric-card metric-purple"><div class="metric-icon">◫</div><div><span>Parts Checked</span><strong class="counter" data-target="{{ parts_checked }}">0</strong></div></div>
-    </div>
-
+    <!-- Filter Bar -->
     <div class="filter-card">
         <div class="filter-heading">
-            <div><span class="section-kicker">FILTERS</span><h3>Search the Excel records</h3></div>
+            <div>
+                <span class="section-kicker">SEARCH &amp; FILTERS</span>
+                <h3>Filter Investigation Records</h3>
+            </div>
             <a href="/view" class="reset-btn compact">Reset</a>
         </div>
-        <form method="get" class="dashboard-filters">
+        <form method="get" action="/view" class="dashboard-filters">
+            <div class="filter-field" style="min-width: 220px;">
+                <label>Keyword Search</label>
+                <input
+                    type="text"
+                    name="search"
+                    value="{{ filters.search or '' }}"
+                    placeholder="Search complaint, customer, finding, PN..."
+                >
+            </div>
 
-    <div class="filter-field">
-        <label>Search</label>
-        <input
-            type="text"
-            name="search"
-            value="{{ filters.search or '' }}"
-            placeholder="Search any Excel field"
-        >
+            <div class="filter-field">
+                <label>Product Line</label>
+                <select name="product_class">
+                    <option value="" {% if not filters.product_class %}selected{% endif %}>All Classes</option>
+                    <option value="CRI" {% if filters.product_class == 'CRI' %}selected{% endif %}>CRI (Passenger / Light)</option>
+                    <option value="CRIN" {% if filters.product_class == 'CRIN' %}selected{% endif %}>CRIN (Commercial)</option>
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label>Month</label>
+                <select name="month">
+                    <option value="">All Months</option>
+                    {% for m in filter_options.months %}
+                    <option value="{{ m.code }}" {% if filters.month == m.code %}selected{% endif %}>{{ m.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label>Customer</label>
+                <select name="customer">
+                    <option value="">All Customers</option>
+                    {% for c in filter_options.customers %}
+                    <option value="{{ c }}" {% if filters.customer == c %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label>Complaint Type</label>
+                <select name="complaint_type">
+                    <option value="">All Types</option>
+                    {% for ct in filter_options.complaint_types %}
+                    <option value="{{ ct }}" {% if filters.complaint_type == ct %}selected{% endif %}>{{ ct }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label>Outcome</label>
+                <select name="outcome">
+                    <option value="">All Outcomes</option>
+                    <option value="Defect Identified" {% if filters.outcome == 'Defect Identified' %}selected{% endif %}>Defect Identified</option>
+                    <option value="Conforming to Specifications" {% if filters.outcome == 'Conforming to Specifications' %}selected{% endif %}>Conforming (OK)</option>
+                    <option value="Pending" {% if filters.outcome == 'Pending' %}selected{% endif %}>Pending Analysis</option>
+                </select>
+            </div>
+
+            <div class="filter-field" style="max-width: 100px;">
+                <label>Per Page</label>
+                <select name="page_size">
+                    <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+                </select>
+            </div>
+
+            <div class="filter-actions">
+                <button type="submit" class="primary-btn">Filter</button>
+            </div>
+        </form>
     </div>
 
-    <div class="filter-field">
-        <label>From Date</label>
-        <input
-            type="date"
-            name="from_date"
-            value="{{ filters.from_date or '' }}"
-        >
-    </div>
-
-    <div class="filter-field">
-        <label>To Date</label>
-        <input
-            type="date"
-            name="to_date"
-            value="{{ filters.to_date or '' }}"
-        >
-    </div>
-
-    <div class="filter-field">
-        <label>Shift</label>
-        <select name="shift">
-            <option value="">All</option>
-            {% for item in options['Shift'] %}
-            <option value="{{ item }}" {% if filters.shift == item %}selected{% endif %}>
-                {{ item }}
-            </option>
-            {% endfor %}
-        </select>
-    </div>
-
-    <div class="filter-field">
-        <label>Type</label>
-        <select name="type">
-            <option value="">All</option>
-            {% for item in options['Type'] %}
-            <option value="{{ item }}" {% if filters.type == item %}selected{% endif %}>
-                {{ item }}
-            </option>
-            {% endfor %}
-        </select>
-    </div>
-
-    <div class="filter-actions">
-        <button type="submit" class="primary-btn">
-            Apply Filters
-        </button>
-    </div>
-
-</form>
-    </div>
-
-    <section class="panel excel-panel">
+    <!-- Records Table -->
+    <section class="panel">
         <div class="panel-header">
-            <div><span class="section-kicker">RESULTS</span><h3>{{ records|length }} record(s) shown</h3></div>
-<span class="status-badge status-ok">
-    OK = 0 particles &middot; NOK = particles found &middot; PENDING = blank
-</span>        </div>
-        <div class="table-wrap">
-            <table class="records-table excel-wide-table">
+            <div>
+                <span class="section-kicker">DATASET</span>
+                <h3>Investigation Master Table (Page {{ current_page }} of {{ total_pages }})</h3>
+            </div>
+            <div class="table-actions">
+                <a href="/download" class="action-btn-sm">Export Filtered Data &rarr;</a>
+            </div>
+        </div>
+
+        {% if records %}
+        <div class="table-wrap full-excel-table-container">
+            <table class="records-table excel-table">
                 <thead>
-                    <tr>{% for header in headers %}<th>{{ header }}</th>{% endfor %}<th>Status</th></tr>
+                    <tr>
+                        <th>Class</th>
+                        <th>Month</th>
+                        <th>Complaint No</th>
+                        <th>Customer</th>
+                        <th>Type</th>
+                        <th>Injector Part No</th>
+                        <th>Qty</th>
+                        <th>Reported Symptom</th>
+                        <th>Technical Investigation Finding</th>
+                        <th>Defect Category</th>
+                        <th>Outcome</th>
+                        <th>Serial No</th>
+                        <th>MFD</th>
+                        <th>Mileage</th>
+                        <th>QC No</th>
+                        <th>Location</th>
+                        <th>Plant</th>
+                        <th>Resp</th>
+                    </tr>
                 </thead>
                 <tbody>
-                {% for record in records %}
-                <tr>
-                    {% for header in headers %}
-                    <td>{{ record[header] or '-' }}</td>
+                    {% for row in records %}
+                    <tr>
+                        <td><span class="pill-badge pill-{{ row.product_class.lower() }}">{{ row.product_class }}</span></td>
+                        <td>{{ row.month_label }}</td>
+                        <td><strong>{{ row.customer_complaint_no }}</strong></td>
+                        <td>{{ row.customer }}</td>
+                        <td><span class="type-pill">{{ row.complaint_type }}</span></td>
+                        <td><code>{{ row.injector_number }}</code></td>
+                        <td style="text-align:center;">{{ row.qty }}</td>
+                        <td>{{ row.complaint }}</td>
+                        <td style="max-width:320px; white-space:normal; font-size:12px;">{{ row.investigation_finding or '-' }}</td>
+                        <td><small>{{ row.defect_category }}</small></td>
+                        <td>
+                            {% if row.outcome == 'Defect Identified' %}
+                            <span class="status-badge status-nok">Defect</span>
+                            {% elif row.outcome == 'Conforming to Specifications' %}
+                            <span class="status-badge status-ok">Conforming</span>
+                            {% else %}
+                            <span class="status-badge status-pending">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td><code>{{ row.serial_no or '-' }}</code></td>
+                        <td>{{ row.mfd or '-' }}</td>
+                        <td>{{ row.mileage or '-' }}</td>
+                        <td>{{ row.qc_number or '-' }}</td>
+                        <td>{{ row.particle_location or '-' }}</td>
+                        <td>{{ row.mfg_plant or '-' }}</td>
+                        <td>{{ row.responsibility or '-' }}</td>
+                    </tr>
                     {% endfor %}
-<td>
-    <td>
-    {% if record.status == 'OK' %}
-        <span class="status-badge status-ok">OK</span>
-    {% elif record.status == 'NOK' %}
-        <span class="status-badge status-nok">NOK</span>
-    {% else %}
-        <span class="status-badge status-pending">PENDING</span>
-    {% endif %}
-</td>
-</td>                </tr>
-                {% else %}
-                <tr><td colspan="18" class="empty-cell">No records found for the selected filters.</td></tr>
-                {% endfor %}
                 </tbody>
             </table>
         </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div class="pagination-container" style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-top:1px solid var(--border);">
+            <div class="pagination-info" style="font-size:13px; color:var(--muted);">
+                Showing <strong>{{ (current_page - 1) * page_size + 1 }}</strong> to <strong>{{ [current_page * page_size, total_filtered]|min }}</strong> of <strong>{{ total_filtered }}</strong> records
+            </div>
+            <div class="pagination-links" style="display:flex; gap:6px;">
+                {% if current_page > 1 %}
+                <a href="?page={{ current_page - 1 }}&page_size={{ page_size }}&product_class={{ filters.product_class or '' }}&month={{ filters.month or '' }}&customer={{ filters.customer or '' }}&complaint_type={{ filters.complaint_type or '' }}&outcome={{ filters.outcome or '' }}&search={{ filters.search or '' }}" class="page-link">&laquo; Prev</a>
+                {% endif %}
+
+                <span class="page-link active">{{ current_page }}</span>
+
+                {% if current_page < total_pages %}
+                <a href="?page={{ current_page + 1 }}&page_size={{ page_size }}&product_class={{ filters.product_class or '' }}&month={{ filters.month or '' }}&customer={{ filters.customer or '' }}&complaint_type={{ filters.complaint_type or '' }}&outcome={{ filters.outcome or '' }}&search={{ filters.search or '' }}" class="page-link">Next &raquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-state">No investigation records match your filter criteria.</div>
+        {% endif %}
     </section>
+
 </div>
 
-<script>
-document.querySelectorAll('.counter').forEach(counter => {
-    const target = Number(counter.dataset.target || 0);
-    counter.textContent = target.toLocaleString();
-});
-</script>
 {% endblock %}

@@ -1,32 +1,122 @@
 {% extends "base.html" %}
-{% block title %}WSA Reports & Export{% endblock %}
+{% block title %}Reports &amp; Export - Investigation Dashboard{% endblock %}
 {% block content %}
 
 <div class="page-content">
     <div class="page-hero compact-hero">
         <div>
-            <div class="eyebrow">REPORTING</div>
+            <div class="eyebrow">EXPORT &amp; REPORTING</div>
             <h1>Reports &amp; Export</h1>
-            <p>Export the same master Excel fields used across Dashboard, View Records, Analytics and Observations.</p>
+            <p>Export filtered investigation records and engineering observations to CSV or native Excel format.</p>
         </div>
-        <div class="hero-stat"><strong>{{ total_rows }}</strong><span>source rows</span></div>
+        <div class="hero-stat">
+            <strong>{{ total_rows }}</strong>
+            <span>master records</span>
+        </div>
     </div>
 
-    {% if source_error %}<div class="alert-card danger-alert">{{ source_error }}</div>{% endif %}
+    {% if source_error %}
+    <div class="alert-card danger-alert">{{ source_error }}</div>
+    {% endif %}
 
+    <!-- Export Panel -->
     <section class="panel">
-        <div class="panel-header"><div><span class="section-kicker">CSV EXPORT</span><h3>Export Excel data</h3></div></div>
-        <form method="post" class="record-form">
-            <div><label>From Date</label><input type="date" name="from_date"></div>
-            <div><label>To Date</label><input type="date" name="to_date"></div>
-            <div><label>Status</label><select name="status"><option value="All">All Records</option><option value="OK">OK Records</option><option value="NOK">NOK Records</option></select></div>
-            <div class="filter-actions"><button type="submit" class="primary-btn">Download CSV</button></div>
+        <div class="panel-header">
+            <div>
+                <span class="section-kicker">CUSTOM EXPORT</span>
+                <h3>Generate Investigation Report</h3>
+            </div>
+        </div>
+
+        <form method="post" action="/download" class="record-form">
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:20px;">
+                <div>
+                    <label>Export Format</label>
+                    <select name="format">
+                        <option value="csv" selected>CSV (.csv) - Comma Separated</option>
+                        <option value="xlsx">Excel (.xlsx) - Full Formatted Workbook</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Product Line</label>
+                    <select name="product_class">
+                        <option value="All">All (CRI &amp; CRIN)</option>
+                        <option value="CRI">CRI (Passenger / Light)</option>
+                        <option value="CRIN">CRIN (Commercial Vehicle)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Month</label>
+                    <select name="month">
+                        <option value="All">All Months</option>
+                        {% for m in filter_options.months %}
+                        <option value="{{ m.code }}">{{ m.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label>Customer</label>
+                    <select name="customer">
+                        <option value="All">All Customers</option>
+                        {% for c in filter_options.customers %}
+                        <option value="{{ c }}">{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label>Complaint Type</label>
+                    <select name="complaint_type">
+                        <option value="All">All Types</option>
+                        {% for ct in filter_options.complaint_types %}
+                        <option value="{{ ct }}">{{ ct }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label>Quality Outcome</label>
+                    <select name="outcome">
+                        <option value="All">All Outcomes</option>
+                        <option value="Defect Identified">Defect Identified</option>
+                        <option value="Conforming to Specifications">Conforming to Specs (OK)</option>
+                        <option value="Pending">Pending Analysis</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="filter-actions" style="margin-top:10px;">
+                <button type="submit" class="primary-btn">Download Export File</button>
+            </div>
         </form>
     </section>
 
+    <!-- Source & Schema Info Cards -->
     <section class="dashboard-grid two-column">
-        <div class="panel"><span class="section-kicker">SOURCE</span><h3>Master data</h3><p class="excel-description">Workbook: <strong>CRIN Line rejection analysis updated.xlsx</strong><br>Sheet: <strong>Particle Summary</strong><br>Fields: 17 master Excel columns plus a derived Status column.</p></div>
-        <div class="panel"><span class="section-kicker">STATUS RULE</span><h3>OK / NOK classification</h3><p class="excel-description"><strong>NOK:</strong> Rejection Date is filled.<br><strong>OK:</strong> Rejection Date is blank.</p></div>
+        <div class="panel">
+            <span class="section-kicker">DATA SOURCE</span>
+            <h3>Master Workbook</h3>
+            <p class="excel-description">
+                Active Source: <strong>{{ source_filename }}</strong><br>
+                Sheets: <strong>CRI</strong> (183 cases) &amp; <strong>CRIN</strong> (92 cases)<br>
+                Total: <strong>275 verified investigation records</strong> throughout 2026.
+            </p>
+        </div>
+
+        <div class="panel">
+            <span class="section-kicker">DATA DICTIONARY</span>
+            <h3>Derived Quality Columns</h3>
+            <p class="excel-description">
+                <strong>Outcome:</strong> Classified as <em>Defect Identified</em>, <em>Conforming to Specifications</em>, or <em>Pending</em>.<br>
+                <strong>Defect Category:</strong> Normalized root cause (Particle at Z-Hole, Nozzle area, Fuel contamination, Magnet, etc.).<br>
+                <strong>Defect Rate:</strong> Calculated as Defect Cases ÷ Completed Cases &times; 100.
+            </p>
+        </div>
     </section>
+
 </div>
+
 {% endblock %}
