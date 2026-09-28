@@ -149,18 +149,17 @@ def test_fastapi_endpoints():
     resp = client.get("/refresh-data", cookies=cookies, follow_redirects=False)
     assert resp.status_code == 302
 
-    # 15. Source Switching Endpoints (GET and POST)
-    resp = client.get("/set-source?source=network", cookies=cookies, follow_redirects=False)
-    assert resp.status_code == 302
+    # 15. In-Code Source Switching Test
+    from backend.investigation_loader import set_active_source, BOSCH_NETWORK_PATH
+    set_active_source("network")
+    assert get_cached_investigation_data()["source_file"] == BOSCH_NETWORK_PATH
 
-    resp = client.post("/set-source", data={"source": "local"}, cookies=cookies, follow_redirects=False)
-    assert resp.status_code == 302
-
-    # Verify back on local
+    set_active_source("local")
     data = get_cached_investigation_data()
     assert data["total_records"] == 275
 
     print("PASS: All FastAPI endpoint tests")
+
 
 
 

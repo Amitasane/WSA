@@ -143,40 +143,33 @@ The application provides dual-source support, allowing seamless switching betwee
    2026(3) - Investigation Dashboard updated.xlsx
    ```
 
-### Choosing Between Data Sources
-You can choose the active data source using three methods:
+### Configuring the Data Source in Code
+The active Excel source is configured directly in code in [`backend/investigation_loader.py`](backend/investigation_loader.py):
 
-#### 1. In the Web UI (Instant Switcher)
-Use the **SOURCE** dropdown directly in the top header:
-- Select **📁 Local Copy** for offline testing.
-- Select **🏢 Bosch Network Share** when on the Bosch corporate intranet / VPN.
-- A live status indicator shows green when the file is reachable, or red if unreachable.
-
-#### 2. In Code (`backend/investigation_loader.py`)
 ```python
-from backend.investigation_loader import set_active_source
+# Option 1: Bosch Corporate Network Share Path
+BOSCH_NETWORK_PATH = r"\\na02fs01.apac.bosch.com\Na_QMM_02_Projects$\08_QMM3_Associates\0-km Analysis Center\05_Customer complaint investigation\02_Investigation reports\2026\details\2026(3) - Investigation Dashboard updated.xlsx"
 
-# Switch to Bosch corporate network share
-set_active_source("network")
+# Option 2: Local Repository Copy
+DEFAULT_EXCEL_FILENAME = "2026(3) - Investigation Dashboard updated.xlsx"
 
-# Switch to local repository copy
-set_active_source("local")
+# >>> CHOOSE ACTIVE SOURCE IN CODE HERE <<<
+ACTIVE_SOURCE = "local"     # Set to "local" for repository copy
+# ACTIVE_SOURCE = "network" # Set to "network" for Bosch network share
 ```
 
-#### 3. Via Environment Variables
-| Variable | Values / Description | Default Fallback |
-| :--- | :--- | :--- |
-| `INVESTIGATION_SOURCE` | `network` or `local` | `local` |
-| `INVESTIGATION_EXCEL_FILE` | Custom absolute path override | Uses active source selection |
+Simply change `ACTIVE_SOURCE` to `"network"` or `"local"` in code.
 
-**PowerShell Example:**
+#### Optional Environment Variable Override
+You can also override the source via environment variable without modifying the code:
 ```powershell
-# Set default to Bosch network share
+# Set source mode (network or local)
 $env:INVESTIGATION_SOURCE="network"
 
-# Or set custom override path
+# Or provide a custom file path
 $env:INVESTIGATION_EXCEL_FILE="\\na02fs01.apac.bosch.com\Na_QMM_02_Projects$\08_QMM3_Associates\0-km Analysis Center\05_Customer complaint investigation\02_Investigation reports\2026\details\2026(3) - Investigation Dashboard updated.xlsx"
 ```
+
 
 
 ### Installation

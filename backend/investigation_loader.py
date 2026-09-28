@@ -11,19 +11,28 @@ from datetime import datetime, date
 from typing import Dict, List, Any, Optional
 from openpyxl import load_workbook
 
-# Default workbook path inside repository
-DEFAULT_EXCEL_FILENAME = "2026(3) - Investigation Dashboard updated.xlsx"
+# =====================================================================
+# DATA SOURCE CONFIGURATION (Choose in code here)
+# =====================================================================
 
-# Bosch Corporate Network Share Path
+# Option 1: Bosch Corporate Network Share Path
 BOSCH_NETWORK_PATH = r"\\na02fs01.apac.bosch.com\Na_QMM_02_Projects$\08_QMM3_Associates\0-km Analysis Center\05_Customer complaint investigation\02_Investigation reports\2026\details\2026(3) - Investigation Dashboard updated.xlsx"
 
-# Environment variable names
-ENV_EXCEL_VAR = "INVESTIGATION_EXCEL_FILE"
-ENV_SOURCE_VAR = "INVESTIGATION_SOURCE"  # 'local', 'network', 'custom'
+# Option 2: Local Repository Copy
+DEFAULT_EXCEL_FILENAME = "2026(3) - Investigation Dashboard updated.xlsx"
 
-# Active source state (default to local, or env var if set)
-_ACTIVE_SOURCE_ID: str = os.environ.get(ENV_SOURCE_VAR, "local").lower()
+# >>> CHOOSE ACTIVE SOURCE IN CODE HERE <<<
+# Change to "network" to use the Bosch network share path
+# Change to "local"   to use the local copy inside the repository
+ACTIVE_SOURCE = "local"  # "local" or "network"
+
+# Optional environment variable override
+ENV_EXCEL_VAR = "INVESTIGATION_EXCEL_FILE"
+ENV_SOURCE_VAR = "INVESTIGATION_SOURCE"
+
+_ACTIVE_SOURCE_ID: str = os.environ.get(ENV_SOURCE_VAR, ACTIVE_SOURCE).lower()
 _CUSTOM_EXCEL_PATH: str = os.environ.get(ENV_EXCEL_VAR, "").strip()
+
 
 # Thread safety lock for cache
 _CACHE_LOCK = threading.Lock()

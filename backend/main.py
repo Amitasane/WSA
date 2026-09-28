@@ -142,45 +142,10 @@ def refresh_data(request: Request):
     return RedirectResponse(referer, status_code=302)
 
 
-@app.get("/set-source")
-def switch_source_get(
-    request: Request,
-    source: str = Query("local"),
-    custom_path: Optional[str] = Query(None),
-):
-    """Switch active data source between Local, Bosch Network Share, or Custom."""
-    try:
-        get_current_user(request)
-    except Exception:
-        return RedirectResponse("/login")
-
-    set_active_source(source, custom_path)
-    referer = request.headers.get("referer") or "/dashboard"
-    base_url = referer.split("?")[0]
-    return RedirectResponse(base_url, status_code=302)
-
-
-@app.post("/set-source")
-def switch_source_post(
-    request: Request,
-    source: str = Form("local"),
-    custom_path: Optional[str] = Form(None),
-):
-    """Switch active data source via form submission."""
-    try:
-        get_current_user(request)
-    except Exception:
-        return RedirectResponse("/login")
-
-    set_active_source(source, custom_path)
-    referer = request.headers.get("referer") or "/dashboard"
-    base_url = referer.split("?")[0]
-    return RedirectResponse(base_url, status_code=302)
-
-
 # ================= HOME =================
 
 @app.get("/", response_class=HTMLResponse)
+
 def home(request: Request):
     try:
         user = get_current_user(request)
