@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alert Rule Builder</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 4px; border: 1px solid #ccc; }
+        h1 { margin-top: 0; color: #0056b3; border-bottom: 2px solid #0056b3; padding-bottom: 10px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .btn { padding: 10px 20px; background: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .btn:hover { background: #004494; }
+        .nav-bar { margin-bottom: 20px; }
+        .nav-bar a { margin-right: 15px; color: #0056b3; text-decoration: none; }
+        .condition-block { background: #f8f9fa; padding: 15px; border: 1px solid #ddd; margin-bottom: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-bar">
+            <a href="/admin/alerts">← Back to Alerts Dashboard</a>
+        </div>
+        
+        <h1>Create / Edit Alert Rule</h1>
+        
+        <form action="#" method="POST">
+            <div class="form-group">
+                <label for="name">Rule Name</label>
+                <input type="text" id="name" name="name" placeholder="e.g., Repeated NOKs at Station QMM3" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="trigger_type">Trigger Type</label>
+                <select id="trigger_type" name="trigger_type">
+                    <option value="NOK">NOK Record</option>
+                    <option value="Threshold">Threshold</option>
+                    <option value="MissingData">Missing Data</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="severity">Severity</label>
+                <select id="severity" name="severity">
+                    <option value="Info">Info</option>
+                    <option value="Warning">Warning</option>
+                    <option value="High">High</option>
+                    <option value="Critical">Critical</option>
+                </select>
+            </div>
+            
+            <h3>Conditions</h3>
+            <div class="condition-block">
+                <div class="form-group">
+                    <label>Field</label>
+                    <select name="field_1">
+                        <option value="Station">Station</option>
+                        <option value="Customer">Customer</option>
+                        <option value="Shift">Shift</option>
+                        <option value="_total_particle">Total Particle</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Operator</label>
+                    <select name="operator_1">
+                        <option value="equals">Equals</option>
+                        <option value=">=">Greater than or Equal to</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Value</label>
+                    <input type="text" name="value_1" placeholder="Value">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="cooldown">Cooldown (Minutes)</label>
+                <input type="number" id="cooldown" name="cooldown" value="60">
+            </div>
+
+            <button type="button" class="btn" onclick="alert('Configuration saved (demo only)')">Save Rule</button>
+        </form>
+    </div>
+</body>
+</html>
