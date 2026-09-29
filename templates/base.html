@@ -51,6 +51,11 @@
             <a href="/analytics" class="sidebar-link {% if request.url.path == '/analytics' %}active{% endif %}"><span class="nav-icon">▥</span><span>Analytics</span></a>
             <a href="/observations" class="sidebar-link {% if request.url.path == '/observations' %}active{% endif %}"><span class="nav-icon">⚠</span><span>Observations</span></a>
             <a href="/download" class="sidebar-link {% if request.url.path == '/download' %}active{% endif %}"><span class="nav-icon">⇩</span><span>Reports &amp; Export</span></a>
+            
+            {% if user and user.role == 'Admin' %}
+            <div class="sidebar-section-label" style="margin-top: 15px;">ADMIN</div>
+            <a href="/admin/alerts" class="sidebar-link {% if request.url.path and request.url.path.startswith('/admin/alerts') %}active{% endif %}"><span class="nav-icon">⚙</span><span>Alert Management</span></a>
+            {% endif %}
         </div>
         <div class="sidebar-bottom">
             <div class="sidebar-status"><span class="status-dot"></span><div><strong>System Active</strong><small>Live Excel source</small></div></div>
