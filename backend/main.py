@@ -13,8 +13,8 @@ from openpyxl import load_workbook
 
 from backend.database import engine, Base, get_db
 from backend import models
+from backend.alerts import models as alert_models
 from backend.auth import authenticate_user, create_user, get_current_user
-
 
 # ================= CODE GENERATORS =================
 
@@ -1577,3 +1577,67 @@ def observations(
 
 # Legacy database CRUD/case/debug endpoints
 # were removed from the Excel-driven web workflow.
+
+# ================= ALERTS API =================
+
+from backend.alerts import service as alert_service
+from backend.alerts import schemas as alert_schemas
+
+@app.post("/api/alerts/evaluate")
+def trigger_alert_evaluation(db: Session = Depends(get_db)):
+    # This endpoint manually triggers an evaluation against current Excel records
+    # Usually this could be scheduled by a background worker, but for now it's an API trigger
+    data = load_current_excel()
+    if data["error"]:
+        raise HTTPException(status_code=500, detail=data["error"])
+        
+    events = alert_service.evaluate_and_trigger(db, data["records"])
+    return {"message": f"Evaluated {len(data['records'])} records. Triggered {len(events)} new events."}
+
+@app.post("/api/alerts/poll", response_model=list[alert_schemas.PowerAutomatePollResponse])
+def poll_pending_alerts(db: Session = Depends(get_db)):
+    # Power Automate will call this to fetch pending alerts
+    return alert_service.get_pending_alerts_for_power_automate(db)
+
+@app.post("/api/alerts/mark-sent/{alert_id}")
+def mark_alert_sent(alert_id: int, db: Session = Depends(get_db)):
+    # Power Automate will call this after successfully sending the email
+    alert_service.mark_alert_as_sent(db, alert_id)
+    return {"status": "success"}
+
+# ================= ALERTS ADMIN UI =================
+
+@app.get("/admin/alerts", response_class=HTMLResponse)
+def alert_dashboard(request: Request, db: Session = Depends(get_db)):
+    try:
+        user = get_current_user(request)
+        if user.role != "Admin":
+            return RedirectResponse("/")
+    except Exception:
+        return RedirectResponse("/login")
+        
+    rules = db.query(alert_models.AlertRule).all()
+    events = db.query(alert_models.AlertEvent).order_by(alert_models.AlertEvent.triggered_at.desc()).limit(50).all()
+    
+    return templates.TemplateResponse("alerts_dashboard.html", {
+        "request": request,
+        "user": user,
+        "rules": rules,
+        "events": events,
+        "show_header": True
+    })
+
+@app.get("/admin/alerts/builder", response_class=HTMLResponse)
+def alert_builder(request: Request):
+    try:
+        user = get_current_user(request)
+        if user.role != "Admin":
+            return RedirectResponse("/")
+    except Exception:
+        return RedirectResponse("/login")
+        
+    return templates.TemplateResponse("alerts_builder.html", {
+        "request": request,
+        "user": user,
+        "show_header": True
+    })
