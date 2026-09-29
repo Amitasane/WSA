@@ -1611,7 +1611,7 @@ def mark_alert_sent(alert_id: int, db: Session = Depends(get_db)):
 def alert_dashboard(request: Request, db: Session = Depends(get_db)):
     try:
         user = get_current_user(request)
-        if user.role != "Admin":
+        if user.role.lower() != "admin":
             return RedirectResponse("/")
     except Exception:
         return RedirectResponse("/login")
@@ -1631,7 +1631,7 @@ def alert_dashboard(request: Request, db: Session = Depends(get_db)):
 def alert_builder(request: Request):
     try:
         user = get_current_user(request)
-        if user.role != "Admin":
+        if user.role.lower() != "admin":
             return RedirectResponse("/")
     except Exception:
         return RedirectResponse("/login")
