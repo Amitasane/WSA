@@ -20,7 +20,7 @@ class AlertConfiguration(Base):
     power_automate_webhook_url = Column(String, default="")
     secret_header_name = Column(String, default="X-WSA-Secret-Token")
     secret_header_value = Column(String, default="")
-    dashboard_base_url = Column(String, default="http://localhost:8000")
+    dashboard_base_url = Column(String, default="http://localhost:8080")
     poll_interval_seconds = Column(Integer, default=60)
     alerts_paused = Column(Boolean, default=False)
     default_sender_name = Column(String, default="WSA Quality Alert System (PS/QMM2-NaP)")

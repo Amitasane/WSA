@@ -17,7 +17,7 @@ The WSA Alert Engine supports two enterprise integration patterns:
 1. Create a **Scheduled cloud flow** (e.g., every 2 minutes).
 2. Add an **HTTP** action:
    * **Method:** `POST`
-   * **URI:** `http://<WSA_HOST>:8000/api/alerts/poll`
+   * **URI:** `http://<WSA_HOST>:8080/api/alerts/poll`
 3. Add an **Apply to each** loop over the returned JSON array:
    * **Action 1:** *Office 365 Outlook — Send an email (V2)*
      * **To:** `@{join(items('Apply_to_each')?['recipients'], ';')}`
@@ -26,7 +26,7 @@ The WSA Alert Engine supports two enterprise integration patterns:
      * **Body:** `@{items('Apply_to_each')?['email_body_html']}`
    * **Action 2:** *HTTP — Acknowledge Delivery*
      * **Method:** `POST`
-     * **URI:** `http://<WSA_HOST>:8000/api/alerts/delivery/@{items('Apply_to_each')?['delivery_id']}/ack`
+     * **URI:** `http://<WSA_HOST>:8080/api/alerts/delivery/@{items('Apply_to_each')?['delivery_id']}/ack`
      * **Body:** `{"status": "DELIVERED", "http_status_code": 200}`
 
 ---
@@ -61,7 +61,7 @@ The WSA Alert Engine supports two enterprise integration patterns:
   "rejection_shift": "2nd",
   "observation": "Today, we analyzed total 48 parts and observed 1 particle(s) at the Z hole location of injector (0445120568).",
   "required_action": "All observations have been logged in WSA for Rejection Station EMI. Kindly review and share the corresponding action plan.",
-  "dashboard_url": "http://localhost:8000/observations",
+  "dashboard_url": "http://localhost:8080/observations",
   "recipients": ["Shums.Tabrez@de.bosch.com", "Manoj.Patil@in.bosch.com"],
   "cc_recipients": ["Ramesh.Saligrama@in.bosch.com", "Naveen.BV@in.bosch.com"],
   "bcc_recipients": [],

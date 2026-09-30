@@ -568,7 +568,7 @@ def save_alert_config(
     power_automate_webhook_url: str = Form(""),
     secret_header_name: str = Form("X-WSA-Secret-Token"),
     secret_header_value: str = Form(""),
-    dashboard_base_url: str = Form("http://localhost:8000"),
+    dashboard_base_url: str = Form("http://localhost:8080"),
     poll_interval_seconds: int = Form(60),
     alerts_paused: Optional[str] = Form(None),
     db: Session = Depends(get_db),
@@ -582,7 +582,7 @@ def save_alert_config(
     cfg.secret_header_name = secret_header_name.strip() or "X-WSA-Secret-Token"
     if secret_header_value.strip() and secret_header_value.strip() != "********":
         cfg.secret_header_value = secret_header_value.strip()
-    cfg.dashboard_base_url = dashboard_base_url.strip() or "http://localhost:8000"
+    cfg.dashboard_base_url = dashboard_base_url.strip() or "http://localhost:8080"
     cfg.poll_interval_seconds = max(15, int(poll_interval_seconds or 60))
     cfg.alerts_paused = alerts_paused in ("on", "true", "1")
     db.commit()

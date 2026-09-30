@@ -211,7 +211,7 @@ def test_recipient_groups_and_bosch_template_rendering(db_session):
         template=rule.template,
         summary=summary,
         matched_records=[recs[0]],
-        dashboard_url="http://localhost:8000/observations",
+        dashboard_url="http://localhost:8080/observations",
         trigger_reason="Particle observed at Z hole",
     )
     assert "CRIN - Line 5 internal rejection analysis MIS" in rendered["subject"]

@@ -15,7 +15,7 @@ def get_or_create_config(db: Session) -> models.AlertConfiguration:
             power_automate_webhook_url="",
             secret_header_name="X-WSA-Secret-Token",
             secret_header_value="",
-            dashboard_base_url="http://localhost:8000",
+            dashboard_base_url="http://localhost:8080",
             poll_interval_seconds=60,
             alerts_paused=False,
         )
@@ -180,7 +180,7 @@ def create_event_and_delivery(
     is_test: bool = False,
 ) -> Tuple[models.AlertEvent, models.AlertDelivery]:
     cfg = get_or_create_config(db)
-    base_url = (cfg.dashboard_base_url or "http://localhost:8000").rstrip("/")
+    base_url = (cfg.dashboard_base_url or "http://localhost:8080").rstrip("/")
     dashboard_url = f"{base_url}/observations"
 
     resolved_recips = resolve_rule_recipients(db, rule, matched_records)
@@ -388,7 +388,7 @@ def run_rule_test_preview(
 
     resolved_recips = resolve_rule_recipients(db, rule, matched)
     cfg = get_or_create_config(db)
-    dashboard_url = f"{(cfg.dashboard_base_url or 'http://localhost:8000').rstrip('/')}/observations"
+    dashboard_url = f"{(cfg.dashboard_base_url or 'http://localhost:8080').rstrip('/')}/observations"
 
     tmpl = rule.template or db.query(models.EmailTemplate).filter(models.EmailTemplate.is_default == True).first()
     rendered = templates.render_alert_email(
