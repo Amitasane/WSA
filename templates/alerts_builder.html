@@ -101,11 +101,9 @@
                     </select>
                 </div>
                 <div class="rb-field">
-                    <label>Data Source Scope</label>
+                    <label>Excel Data Source</label>
                     <select name="data_source" id="rb_source">
-                        <option value="ALL" {% if not rule or rule.data_source == 'ALL' %}selected{% endif %}>All Sources (Particle Summary + Investigation)</option>
-                        <option value="PARTICLE_SUMMARY" {% if rule and rule.data_source == 'PARTICLE_SUMMARY' %}selected{% endif %}>WSA Particle Summary Only</option>
-                        <option value="INVESTIGATION" {% if rule and rule.data_source == 'INVESTIGATION' %}selected{% endif %}>CRI/CRIN Investigation Workbook Only</option>
+                        <option value="PARTICLE_SUMMARY" selected>CRIN Line rejection analysis updated.xlsx (Particle Summary)</option>
                     </select>
                 </div>
             </div>

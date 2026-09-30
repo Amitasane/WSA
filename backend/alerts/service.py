@@ -146,28 +146,10 @@ def is_duplicate_or_in_cooldown(
     return False, ""
 
 
-def collect_all_normalized_records(investigation_records: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
-    """Loads and normalizes records from both WSA Particle Summary and Investigation Dashboard."""
-    unified: List[Dict[str, Any]] = []
-
-    # 1. Particle Summary records
-    ps_raw = change_detector.load_particle_summary_records()
-    for r in ps_raw:
-        unified.append(change_detector.normalize_unified_record(r))
-
-    # 2. Investigation Dashboard records
-    if investigation_records is None:
-        try:
-            from backend.investigation_loader import get_cached_investigation_data
-            inv_data = get_cached_investigation_data()
-            investigation_records = inv_data.get("records", [])
-        except Exception:
-            investigation_records = []
-
-    for r in investigation_records or []:
-        unified.append(change_detector.normalize_unified_record(r))
-
-    return unified
+def collect_all_normalized_records(raw_records: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+    """Loads and normalizes records exclusively from WSA 'CRIN Line rejection analysis updated.xlsx' (Particle Summary)."""
+    source_rows = raw_records if raw_records is not None else change_detector.load_particle_summary_records()
+    return [change_detector.normalize_unified_record(r) for r in (source_rows or [])]
 
 
 def create_event_and_delivery(

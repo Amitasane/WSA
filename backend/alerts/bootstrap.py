@@ -222,12 +222,12 @@ def ensure_alert_system_initialized(db: Session) -> None:
         # Rule 1: Z-Hole / Critical Particle Detection
         r1 = models.AlertRule(
             name="CRIN Line 5 — Z-Hole / Nozzle Particle Detected",
-            description="Immediate CRITICAL alert when a particle is observed at Z-hole or Nozzle during WSA analysis.",
+            description="Immediate CRITICAL alert when a particle is observed at Z-hole, A-hole, or Inside Nozzle in Particle Summary.",
             is_enabled=True,
             priority=1,
             rule_category="EVENT",
             trigger_type="PARTICLE_LOCATION",
-            data_source="ALL",
+            data_source="PARTICLE_SUMMARY",
             severity="CRITICAL",
             logical_operator="AND",
             cooldown_minutes=60,
@@ -247,12 +247,12 @@ def ensure_alert_system_initialized(db: Session) -> None:
         # Rule 2: Repeated Station NOK Threshold
         r2 = models.AlertRule(
             name="Repeated NOK Threshold (>= 2 NOKs at Same Station)",
-            description="Triggers when any station accumulates 2 or more NOK cases within a 4-hour / shift window.",
+            description="Triggers when EMI Station, HD Station, or Visual Station accumulates 2 or more NOK records within a 4-hour window.",
             is_enabled=True,
             priority=2,
             rule_category="EVENT",
             trigger_type="REPEATED_NOK_WINDOW",
-            data_source="ALL",
+            data_source="PARTICLE_SUMMARY",
             severity="WARNING",
             logical_operator="AND",
             time_window_hours=4.0,
@@ -272,12 +272,12 @@ def ensure_alert_system_initialized(db: Session) -> None:
         # Rule 3: Scheduled Daily Line 5 Analysis MIS Summary
         r3 = models.AlertRule(
             name="Daily CRIN Line 5 Analysis MIS Summary (17:00)",
-            description="Scheduled daily MIS email summarizing total parts checked and particle observations.",
+            description="Scheduled daily MIS email summarizing total parts checked and particle observations from Particle Summary.",
             is_enabled=True,
             priority=5,
             rule_category="SCHEDULED",
             trigger_type="DAILY_SUMMARY",
-            data_source="ALL",
+            data_source="PARTICLE_SUMMARY",
             severity="INFO",
             logical_operator="AND",
             schedule_time="17:00",
@@ -294,20 +294,19 @@ def ensure_alert_system_initialized(db: Session) -> None:
         if g_mgmt:
             db.add(models.RuleRecipientAssignment(rule_id=r3.id, recipient_type="CC", group_id=g_mgmt.id))
 
-        # Rule 4: Pending Investigation Follow-Up (> 3 Days)
+        # Rule 4: Missing Daily WSA Analysis Update by Deadline
         r4 = models.AlertRule(
-            name="Pending Investigation / Action-Plan Follow-Up (> 3 Days)",
-            description="Alerts when an investigation remains Pending beyond 3 days without closure.",
+            name="Missing WSA Line 5 Analysis Update by 16:30 Deadline",
+            description="Alerts when no Particle Summary analysis entry or 0 parts checked is recorded for today by 16:30.",
             is_enabled=True,
             priority=4,
             rule_category="SCHEDULED",
-            trigger_type="PENDING_INVESTIGATION_AGE",
-            data_source="INVESTIGATION",
+            trigger_type="MISSING_UPDATE_DEADLINE",
+            data_source="PARTICLE_SUMMARY",
             severity="WARNING",
             logical_operator="AND",
-            threshold_value=3.0,
-            schedule_time="10:00",
-            cooldown_minutes=1440,
+            schedule_time="16:30",
+            cooldown_minutes=720,
             template_id=t_gemba.id if t_gemba else None,
         )
         db.add(r4)

@@ -14,32 +14,18 @@ _LAST_SCHEDULED_RUN_MINUTE: str = ""
 
 
 def _check_excel_mtimes() -> bool:
-    """Returns True if any monitored Excel workbook was modified since last check."""
+    """Returns True if 'CRIN Line rejection analysis updated.xlsx' was modified since last check."""
     changed = False
-    paths = []
-
-    p1 = change_detector.find_particle_workbook_path()
-    if p1:
-        paths.append(p1)
-
-    try:
-        from backend.investigation_loader import get_excel_file_path
-        p2 = get_excel_file_path()
-        if p2:
-            paths.append(p2)
-    except Exception:
-        pass
-
-    for path in paths:
-        if path and os.path.exists(path):
-            try:
-                mtime = os.path.getmtime(path)
-                prev = _LAST_MTIMES.get(path)
-                _LAST_MTIMES[path] = mtime
-                if prev is not None and mtime > prev:
-                    changed = True
-            except Exception:
-                pass
+    path = change_detector.find_particle_workbook_path()
+    if path and os.path.exists(path):
+        try:
+            mtime = os.path.getmtime(path)
+            prev = _LAST_MTIMES.get(path)
+            _LAST_MTIMES[path] = mtime
+            if prev is not None and mtime > prev:
+                changed = True
+        except Exception:
+            pass
     return changed
 
 
