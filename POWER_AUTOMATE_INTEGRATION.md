@@ -1,65 +1,71 @@
-# Power Automate Integration for WSA Quality Alerts
+# Microsoft Power Automate Integration Guide — WSA Enterprise Quality Alert Engine
 
-This document explains how to set up the Power Automate flows to consume the new WSA Alert API and send emails.
+This document describes how to connect the **WSA Quality Alert & Notification Engine** to **Microsoft Power Automate** for automated Outlook email delivery across Bosch functional groups (`PS/QMM`, `NaP/MFC`, `NaP/MFN`, `NaP/TEF`, `PS-DC/ENI1`, and Management CC).
 
-## 1. NOK / Restricted Defect -> WSA Alert API -> Power Automate -> Outlook Email
+---
 
-This flow fetches newly generated alerts from the WSA backend and sends them to the appropriate recipients.
+## 1. Supported Integration Modes
 
-### Step-by-Step Flow Configuration
+The WSA Alert Engine supports two enterprise integration patterns:
 
-1. **Trigger:** `Recurrence`
-   - Schedule it to run every **5 minutes** (or as desired).
-2. **Action 1:** `HTTP`
-   - **Method:** `POST`
-   - **URI:** `http://<WSA_SERVER_IP>:8000/api/alerts/poll`
-   - **Headers:** `Content-Type: application/json`
-3. **Action 2:** `Parse JSON`
-   - **Content:** `Body` from the HTTP action.
-   - **Schema:** 
-     ```json
-     {
-         "type": "array",
-         "items": {
-             "type": "object",
-             "properties": {
-                 "alert_id": { "type": "integer" },
-                 "rule_name": { "type": "string" },
-                 "severity": { "type": "string" },
-                 "message": { "type": "string" },
-                 "wsa_url": { "type": "string" }
-             }
-         }
-     }
-     ```
-4. **Action 3:** `Apply to each`
-   - **Input:** `Body` (the array of alerts from Parse JSON)
-   - **Inside the loop:**
-     1. **Action 3.1:** `Send an email (V2) - Office 365 Outlook`
-        - **To:** `<Your Quality Team / Environment Variable>`
-        - **Subject:** `[WSA Alert] - @{items('Apply_to_each')?['severity']} - @{items('Apply_to_each')?['rule_name']}`
-        - **Body (HTML):**
-          ```html
-          <h2>WSA Quality Alert Triggered</h2>
-          <p><b>Rule:</b> @{items('Apply_to_each')?['rule_name']}</p>
-          <p><b>Severity:</b> @{items('Apply_to_each')?['severity']}</p>
-          <p><b>Details:</b> @{items('Apply_to_each')?['message']}</p>
-          <p><a href="@{items('Apply_to_each')?['wsa_url']}">View in WSA Dashboard</a></p>
-          ```
-     2. **Action 3.2:** `HTTP` (Mark as Sent)
-        - **Method:** `POST`
-        - **URI:** `http://<WSA_SERVER_IP>:8000/api/alerts/mark-sent/@{items('Apply_to_each')?['alert_id']}`
-        - This acknowledges back to WSA so the alert isn't sent again.
+### Mode A — Outbound HTTPS Webhook Push (Recommended for Cloud / Hybrid Flows)
+1. In Power Automate, create an **Automated cloud flow** with the trigger **"When an HTTP request is received"**.
+2. Copy the generated HTTP POST URL and paste it into **WSA Admin Alert Center → System Health → Power Automate HTTP Webhook Trigger URL** (or set the `WSA_POWER_AUTOMATE_WEBHOOK_URL` environment variable).
+3. Whenever an event or scheduled rule triggers, WSA pushes the structured JSON payload (including `recipients`, `cc_recipients`, `email_subject`, and `email_body_html`) directly to Power Automate with automatic retry and exponential backoff.
 
-## 2. Shift Summary -> Power Automate -> Outlook Email
+### Mode B — Polling via On-Premises Data Gateway (`POST /api/alerts/poll`)
+1. Create a **Scheduled cloud flow** (e.g., every 2 minutes).
+2. Add an **HTTP** action:
+   * **Method:** `POST`
+   * **URI:** `http://<WSA_HOST>:8000/api/alerts/poll`
+3. Add an **Apply to each** loop over the returned JSON array:
+   * **Action 1:** *Office 365 Outlook — Send an email (V2)*
+     * **To:** `@{join(items('Apply_to_each')?['recipients'], ';')}`
+     * **CC:** `@{join(items('Apply_to_each')?['cc_recipients'], ';')}`
+     * **Subject:** `@{items('Apply_to_each')?['email_subject']}`
+     * **Body:** `@{items('Apply_to_each')?['email_body_html']}`
+   * **Action 2:** *HTTP — Acknowledge Delivery*
+     * **Method:** `POST`
+     * **URI:** `http://<WSA_HOST>:8000/api/alerts/delivery/@{items('Apply_to_each')?['delivery_id']}/ack`
+     * **Body:** `{"status": "DELIVERED", "http_status_code": 200}`
 
-For scheduled digest emails (e.g., end of shift), you do not need the rule engine to fire per-record. Instead, you can schedule a Power Automate flow to pull the regular analytics endpoint or a new `/api/alerts/digest` endpoint (to be added) and format it.
+---
 
-1. **Trigger:** `Recurrence`
-   - Schedule for the exact times shifts end (e.g., 07:00, 15:00, 23:00).
-2. **Action 1:** `HTTP`
-   - **Method:** `GET`
-   - **URI:** `http://<WSA_SERVER_IP>:8000/api/metrics/shift-summary`
-3. **Action 2:** `Parse JSON` (Parse the KPI metrics)
-4. **Action 3:** `Send an email (V2)`
-   - Include the KPIs (NOK rate, Total Parts Checked, Top Defect Stations) in a nicely formatted HTML table.
+## 2. Standardized JSON Payload Schema
+
+```json
+{
+  "event_id": "evt_20260930113000_a1b2c3",
+  "delivery_id": 1,
+  "is_test": false,
+  "rule_id": 1,
+  "rule_name": "CRIN Line 5 — Z-Hole / Nozzle Particle Detected",
+  "rule_category": "EVENT",
+  "trigger_type": "PARTICLE_LOCATION",
+  "severity": "CRITICAL",
+  "triggered_at": "2026-09-30T11:30:00",
+  "date": "17-09-2026",
+  "shift": "1st",
+  "station": "EMI",
+  "auditor": "Shravani Pawar",
+  "customer": "TML",
+  "injector_type": "0445120568",
+  "parts_checked": 48,
+  "nok_count": 1,
+  "nok_rate": 2.08,
+  "total_particles": 1,
+  "particle_location": "Z hole",
+  "chemistry": "FeCr",
+  "size": "420 um",
+  "rejection_date": "16-09-2026",
+  "rejection_shift": "2nd",
+  "observation": "Today, we analyzed total 48 parts and observed 1 particle(s) at the Z hole location of injector (0445120568).",
+  "required_action": "All observations have been logged in WSA for Rejection Station EMI. Kindly review and share the corresponding action plan.",
+  "dashboard_url": "http://localhost:8000/observations",
+  "recipients": ["Shums.Tabrez@de.bosch.com", "Manoj.Patil@in.bosch.com"],
+  "cc_recipients": ["Ramesh.Saligrama@in.bosch.com", "Naveen.BV@in.bosch.com"],
+  "bcc_recipients": [],
+  "email_subject": "[CRITICAL] RE: CRIN - Line 5 internal rejection analysis MIS (17-09-2026 | EMI)",
+  "email_body_html": "<!DOCTYPE html>..."
+}
+```

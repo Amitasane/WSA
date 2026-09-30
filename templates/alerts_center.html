@@ -1,0 +1,623 @@
+{% extends "base.html" %}
+{% block title %}Alert Center — WSA Quality Alert Engine{% endblock %}
+{% block content %}
+
+<style>
+.ac-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:10px; }
+.ac-tab { padding:8px 16px; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; color:#475569; background:#f1f5f9; border:1px solid #cbd5e1; transition:0.15s; }
+.ac-tab:hover { background:#e2e8f0; color:#0f172a; }
+.ac-tab.active { background:#0a1f44; color:#ffffff; border-color:#0a1f44; }
+.sev-badge { display:inline-block; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; text-transform:uppercase; }
+.sev-CRITICAL { background:#ffe4e6; color:#be123c; border:1px solid #fda4af; }
+.sev-WARNING { background:#fef3c7; color:#b45309; border:1px solid #fcd34d; }
+.sev-INFO { background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc; }
+.st-badge { display:inline-block; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+.st-DELIVERED { background:#dcfce7; color:#15803d; }
+.st-QUEUED, .st-SENDING { background:#dbeafe; color:#1d4ed8; }
+.st-FAILED { background:#fee2e2; color:#b91c1c; }
+.ac-table { width:100%; border-collapse:collapse; font-size:13px; background:#fff; }
+.ac-table th { background:#f8fafc; color:#334155; font-weight:600; text-align:left; padding:10px 12px; border-bottom:2px solid #e2e8f0; }
+.ac-table td { padding:10px 12px; border-bottom:1px solid #e2e8f0; vertical-align:top; }
+.ac-btn { display:inline-flex; align-items:center; gap:5px; padding:6px 12px; border-radius:5px; font-size:12px; font-weight:600; text-decoration:none; cursor:pointer; border:1px solid transparent; }
+.ac-btn-primary { background:#005691; color:#fff; }
+.ac-btn-outline { background:#fff; color:#1e293b; border-color:#cbd5e1; }
+.ac-btn-danger { background:#fff1f2; color:#be123c; border-color:#fecdd3; }
+.ac-modal-backdrop { display:none; position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:9999; align-items:center; justify-content:center; padding:20px; }
+.ac-modal { background:#fff; max-width:860px; width:100%; max-height:90vh; overflow-y:auto; border-radius:8px; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.25); }
+.human-rule-box { background:#f8fafc; border-left:3px solid #005691; padding:6px 10px; font-size:12px; color:#334155; margin-top:4px; border-radius:0 4px 4px 0; }
+</style>
+
+<div class="page-content dashboard-page">
+    <div class="page-hero">
+        <div>
+            <div class="eyebrow">ENTERPRISE QUALITY ALERT &amp; NOTIFICATION SUBSYSTEM</div>
+            <h1>Admin Alert Center</h1>
+            <p>Event-driven &amp; scheduled CRIN Line 5 / WSA quality alerts, recipient groups, Bosch MIS templates, and Power Automate delivery monitoring.</p>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button type="button" class="ac-btn ac-btn-outline" onclick="evaluateAlertsNow(false)">↻ Evaluate New Changes</button>
+            <a href="/admin/alerts/builder" class="ac-btn ac-btn-primary">+ Create Alert Rule</a>
+        </div>
+    </div>
+
+    {% if flash_msg %}
+    <div class="alert-card" style="background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46;padding:12px 16px;border-radius:6px;margin-bottom:16px;font-weight:600;">
+        ✓ {{ flash_msg }}
+    </div>
+    {% endif %}
+
+    <!-- Navigation Tabs -->
+    <div class="ac-tabs">
+        <a href="/admin/alerts?tab=overview" class="ac-tab {% if active_tab == 'overview' %}active{% endif %}">Overview</a>
+        <a href="/admin/alerts?tab=rules" class="ac-tab {% if active_tab == 'rules' %}active{% endif %}">Rules ({{ kpis.total_rules }})</a>
+        <a href="/admin/alerts?tab=recipients" class="ac-tab {% if active_tab == 'recipients' %}active{% endif %}">Recipient Groups ({{ recipient_groups|length }})</a>
+        <a href="/admin/alerts?tab=templates" class="ac-tab {% if active_tab == 'templates' %}active{% endif %}">Email Templates ({{ email_templates|length }})</a>
+        <a href="/admin/alerts?tab=history" class="ac-tab {% if active_tab == 'history' %}active{% endif %}">Delivery History</a>
+        <a href="/admin/alerts?tab=health" class="ac-tab {% if active_tab == 'health' %}active{% endif %}">System Health</a>
+    </div>
+
+    <!-- ==================== TAB 1: OVERVIEW ==================== -->
+    {% if active_tab == 'overview' %}
+    <div class="dashboard-cards" style="margin-bottom:22px;">
+        <div class="metric-card metric-blue">
+            <div class="metric-icon">⚙</div>
+            <div>
+                <span>Enabled Rules</span>
+                <strong>{{ kpis.enabled_rules }} / {{ kpis.total_rules }}</strong>
+                <small>Active event &amp; scheduled rules</small>
+            </div>
+        </div>
+        <div class="metric-card metric-blue">
+            <div class="metric-icon">⚡</div>
+            <div>
+                <span>Alerts Today</span>
+                <strong>{{ kpis.alerts_today }}</strong>
+                <small>Production events triggered today</small>
+            </div>
+        </div>
+        <div class="metric-card metric-green">
+            <div class="metric-icon">✓</div>
+            <div>
+                <span>Successful Deliveries</span>
+                <strong>{{ kpis.delivered_count }}</strong>
+                <small>Delivered via Power Automate</small>
+            </div>
+        </div>
+        <div class="metric-card metric-red">
+            <div class="metric-icon">!</div>
+            <div>
+                <span>Failed / Pending Retries</span>
+                <strong>{{ kpis.failed_count }} / {{ kpis.queued_count }}</strong>
+                <small>Failed vs Queued in pipeline</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="filter-card" style="margin-bottom:20px;">
+        <div class="filter-heading">
+            <div>
+                <span class="section-kicker">SYSTEM STATUS &amp; QUICK ACTIONS</span>
+                <h3>Power Automate &amp; Data Change Detection Status</h3>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button type="button" class="ac-btn ac-btn-outline" onclick="evaluateAlertsNow(true)">Force Full Re-Evaluation</button>
+                <a href="/admin/alerts?tab=rules" class="ac-btn ac-btn-primary">Manage Rules →</a>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;font-size:13px;">
+            <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;">
+                <strong>Tracked Excel Row Fingerprints:</strong><br>
+                <span>{{ kpis.snapshot_count }} baseline/monitored records</span>
+            </div>
+            <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;">
+                <strong>Critical Alerts Logged:</strong><br>
+                <span style="color:#be123c;font-weight:700;">{{ kpis.critical_count }} CRITICAL events</span>
+            </div>
+            <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;">
+                <strong>Last Evaluation Cycle:</strong><br>
+                <span>{{ config.last_evaluation_at.strftime('%Y-%m-%d %H:%M:%S') if config.last_evaluation_at else 'Ready' }}</span>
+            </div>
+            <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;">
+                <strong>Last Power Automate Communication:</strong><br>
+                <span>{{ config.last_webhook_success_at.strftime('%Y-%m-%d %H:%M:%S') if config.last_webhook_success_at else 'Poll Endpoint Active (/api/alerts/poll)' }}</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ==================== TAB 2: RULES ==================== -->
+    {% if active_tab == 'rules' or active_tab == 'overview' %}
+    <div class="filter-card" style="margin-bottom:20px;">
+        <div class="filter-heading">
+            <div>
+                <span class="section-kicker">CONFIGURED ALERT RULES</span>
+                <h3>Event-Driven &amp; Scheduled Quality Rules</h3>
+            </div>
+            <form method="get" action="/admin/alerts" style="display:flex;gap:8px;">
+                <input type="hidden" name="tab" value="rules">
+                <input type="text" name="search" value="{{ filters.search }}" placeholder="Search rule name..." style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px;">
+                <button type="submit" class="ac-btn ac-btn-outline">Search</button>
+                <a href="/admin/alerts/builder" class="ac-btn ac-btn-primary">+ New Rule</a>
+            </form>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table class="ac-table">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Rule &amp; Plain-English Behavior Summary</th>
+                        <th>Category / Trigger</th>
+                        <th>Severity</th>
+                        <th>Recipients (To / CC)</th>
+                        <th>Cooldown</th>
+                        <th>Last Triggered</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in rules_view %}
+                    {% set r = item.rule %}
+                    <tr>
+                        <td>
+                            <form method="post" action="/admin/alerts/rules/{{ r.id }}/toggle" style="margin:0;">
+                                <button type="submit" class="ac-btn {% if r.is_enabled %}ac-btn-primary{% else %}ac-btn-outline{% endif %}" style="font-size:11px;padding:4px 8px;">
+                                    {{ '● Enabled' if r.is_enabled else '○ Disabled' }}
+                                </button>
+                            </form>
+                        </td>
+                        <td>
+                            <strong>{{ r.name }}</strong>
+                            {% if r.description %}<div style="font-size:12px;color:#64748b;">{{ r.description }}</div>{% endif %}
+                            <div class="human-rule-box">{{ item.human_summary }}</div>
+                        </td>
+                        <td>
+                            <span class="st-badge st-QUEUED">{{ r.rule_category }}</span><br>
+                            <small style="color:#475569;">{{ r.trigger_type }}</small>
+                        </td>
+                        <td><span class="sev-badge sev-{{ r.severity }}">{{ r.severity }}</span></td>
+                        <td style="font-size:12px;">
+                            <div><strong>To:</strong> {{ item.to_groups|join(', ') if item.to_groups else 'None' }}</div>
+                            {% if item.cc_groups %}<div><strong>CC:</strong> {{ item.cc_groups|join(', ') }}</div>{% endif %}
+                        </td>
+                        <td>{{ r.cooldown_minutes }} min</td>
+                        <td style="font-size:12px;">{{ r.last_triggered_at.strftime('%Y-%m-%d %H:%M') if r.last_triggered_at else 'Never' }}</td>
+                        <td>
+                            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                                <a href="/admin/alerts/builder?id={{ r.id }}" class="ac-btn ac-btn-outline">Edit</a>
+                                <button type="button" class="ac-btn ac-btn-outline" onclick="runTestRule({{ r.id }}, false)">Send Test</button>
+                                <form method="post" action="/admin/alerts/rules/{{ r.id }}/duplicate" style="margin:0;">
+                                    <button type="submit" class="ac-btn ac-btn-outline">Duplicate</button>
+                                </form>
+                                <a href="/admin/alerts?tab=history&rule_id={{ r.id }}" class="ac-btn ac-btn-outline">History</a>
+                                <form method="post" action="/admin/alerts/rules/{{ r.id }}/delete" style="margin:0;" onsubmit="return confirm('Delete this rule?');">
+                                    <button type="submit" class="ac-btn ac-btn-danger">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8">No rules found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ==================== TAB 3: RECIPIENT GROUPS ==================== -->
+    {% if active_tab == 'recipients' %}
+    <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:20px;align-items:start;">
+        <div class="filter-card">
+            <div class="filter-heading">
+                <div>
+                    <span class="section-kicker">BOSCH FUNCTIONAL GROUPS</span>
+                    <h3>Reusable Recipient Groups</h3>
+                </div>
+            </div>
+            <table class="ac-table">
+                <thead>
+                    <tr>
+                        <th>Group Name</th>
+                        <th>Dept</th>
+                        <th>Active Emails</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for g in recipient_groups %}
+                    {% set member_emails = [] %}
+                    {% for m in g.memberships %}
+                        {% if m.recipient and m.recipient.is_active %}
+                            {% set _ = member_emails.append(m.recipient.email) %}
+                        {% endif %}
+                    {% endfor %}
+                    <tr>
+                        <td>
+                            <strong>{{ g.name }}</strong>
+                            <div style="font-size:12px;color:#64748b;">{{ g.description }}</div>
+                        </td>
+                        <td><span class="st-badge st-QUEUED">{{ g.department_code or 'BOSCH' }}</span></td>
+                        <td style="font-size:12px;max-width:280px;word-break:break-all;">
+                            <strong>{{ member_emails|length }} recipients:</strong><br>
+                            {{ member_emails[:6]|join(', ') }}{% if member_emails|length > 6 %} (+{{ member_emails|length - 6 }} more){% endif %}
+                        </td>
+                        <td>{{ 'Active' if g.is_active else 'Inactive' }}</td>
+                        <td>
+                            <div style="display:flex;gap:5px;">
+                                <button type="button" class="ac-btn ac-btn-outline"
+                                    onclick='populateGroupForm({{ g.id }}, {{ g.name|tojson }}, {{ (g.department_code or "")|tojson }}, {{ (g.description or "")|tojson }}, {{ (member_emails|join(", "))|tojson }})'>
+                                    Edit
+                                </button>
+                                <form method="post" action="/admin/alerts/recipients/group/{{ g.id }}/toggle" style="margin:0;">
+                                    <button type="submit" class="ac-btn ac-btn-outline">{{ 'Disable' if g.is_active else 'Enable' }}</button>
+                                </form>
+                                <form method="post" action="/admin/alerts/recipients/group/{{ g.id }}/delete" style="margin:0;" onsubmit="return confirm('Delete recipient group?');">
+                                    <button type="submit" class="ac-btn ac-btn-danger">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="filter-card">
+            <div class="filter-heading">
+                <div>
+                    <span class="section-kicker">ADD / EDIT GROUP</span>
+                    <h3 id="grp-form-title">Create Recipient Group</h3>
+                </div>
+            </div>
+            <form method="post" action="/admin/alerts/recipients/group/save">
+                <input type="hidden" name="group_id" id="grp_id" value="">
+                <div class="filter-field" style="margin-bottom:12px;">
+                    <label>Group Name</label>
+                    <input type="text" name="name" id="grp_name" required placeholder="e.g. Line 5 Production" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">
+                </div>
+                <div class="filter-field" style="margin-bottom:12px;">
+                    <label>Department Code</label>
+                    <input type="text" name="department_code" id="grp_dept" placeholder="e.g. NaP/MFC, PS/QMM" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">
+                </div>
+                <div class="filter-field" style="margin-bottom:12px;">
+                    <label>Description</label>
+                    <input type="text" name="description" id="grp_desc" placeholder="Functional role of this group" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">
+                </div>
+                <div class="filter-field" style="margin-bottom:14px;">
+                    <label>Email Addresses (comma, semicolon, or newline separated)</label>
+                    <textarea name="emails_text" id="grp_emails" rows="6" placeholder="user1@in.bosch.com, user2@in.bosch.com" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;font-family:monospace;font-size:12px;"></textarea>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button type="submit" class="ac-btn ac-btn-primary">Save Recipient Group</button>
+                    <button type="button" class="ac-btn ac-btn-outline" onclick="populateGroupForm('','','','','')">Clear</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ==================== TAB 4: EMAIL TEMPLATES ==================== -->
+    {% if active_tab == 'templates' %}
+    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:20px;align-items:start;">
+        <div class="filter-card">
+            <div class="filter-heading">
+                <div>
+                    <span class="section-kicker">BOSCH MIS EMAIL TEMPLATES</span>
+                    <h3>Configured Templates</h3>
+                </div>
+            </div>
+            <table class="ac-table">
+                <thead>
+                    <tr>
+                        <th>Template Name</th>
+                        <th>Subject Pattern</th>
+                        <th>Observation Wording</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in email_templates %}
+                    <tr>
+                        <td>
+                            <strong>{{ t.name }}</strong>
+                            {% if t.is_default %}<span class="st-badge st-DELIVERED">Default</span>{% endif %}
+                            <div style="font-size:12px;color:#64748b;">{{ t.description }}</div>
+                        </td>
+                        <td style="font-size:12px;font-family:monospace;">{{ t.subject_template }}</td>
+                        <td style="font-size:12px;">{{ t.observation_template }}</td>
+                        <td>
+                            <button type="button" class="ac-btn ac-btn-outline"
+                                onclick='populateTemplateForm({{ t.id }}, {{ t.name|tojson }}, {{ (t.description or "")|tojson }}, {{ t.subject_template|tojson }}, {{ t.intro_text|tojson }}, {{ t.observation_template|tojson }}, {{ t.action_template|tojson }}, {{ t.footer_text|tojson }})'>
+                                Edit
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="filter-card">
+            <div class="filter-heading">
+                <div>
+                    <span class="section-kicker">TEMPLATE EDITOR</span>
+                    <h3 id="tmpl-form-title">Create / Edit Email Template</h3>
+                </div>
+            </div>
+            <div style="background:#f8fafc;padding:8px 10px;border-radius:5px;font-size:11px;color:#334155;margin-bottom:12px;border:1px solid #e2e8f0;">
+                <strong>Supported Variables:</strong>
+                <code>{{ '{{date}}' }}</code> <code>{{ '{{shift}}' }}</code> <code>{{ '{{station}}' }}</code> <code>{{ '{{auditor}}' }}</code>
+                <code>{{ '{{customer}}' }}</code> <code>{{ '{{injector_type}}' }}</code> <code>{{ '{{parts_checked}}' }}</code>
+                <code>{{ '{{nok_count}}' }}</code> <code>{{ '{{nok_rate}}' }}</code> <code>{{ '{{total_particles}}' }}</code>
+                <code>{{ '{{particle_location}}' }}</code> <code>{{ '{{rejection_date}}' }}</code> <code>{{ '{{rejection_shift}}' }}</code>
+                <code>{{ '{{chemistry}}' }}</code> <code>{{ '{{size}}' }}</code> <code>{{ '{{rule_name}}' }}</code> <code>{{ '{{severity}}' }}</code>
+            </div>
+            <form method="post" action="/admin/alerts/templates/save">
+                <input type="hidden" name="template_id" id="tmpl_id" value="">
+                <div class="filter-field" style="margin-bottom:10px;">
+                    <label>Template Name</label>
+                    <input type="text" name="name" id="tmpl_name" required style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">
+                </div>
+                <div class="filter-field" style="margin-bottom:10px;">
+                    <label>Description</label>
+                    <input type="text" name="description" id="tmpl_desc" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">
+                </div>
+                <div class="filter-field" style="margin-bottom:10px;">
+                    <label>Subject Line Template</label>
+                    <input type="text" name="subject_template" id="tmpl_subj" required value="[{{ '{{severity}}' }}] CRIN - Line 5 internal rejection analysis MIS ({{ '{{date}}' }})" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">
+                </div>
+                <div class="filter-field" style="margin-bottom:10px;">
+                    <label>Greeting / Intro Text</label>
+                    <input type="text" name="intro_text" id="tmpl_intro" value="Dear Team," style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">
+                </div>
+                <div class="filter-field" style="margin-bottom:10px;">
+                    <label>Observation Section Template</label>
+                    <textarea name="observation_template" id="tmpl_obs" rows="3" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">Today, we analyzed total {{ '{{parts_checked}}' }} parts and observed {{ '{{total_particles}}' }} particle(s) at the {{ '{{particle_location}}' }} location of injector.</textarea>
+                </div>
+                <div class="filter-field" style="margin-bottom:10px;">
+                    <label>Required Action Section Template</label>
+                    <textarea name="action_template" id="tmpl_act" rows="2" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">All observations have been discussed with FLM. Kindly share the corresponding action plan for the discussed points.</textarea>
+                </div>
+                <div class="filter-field" style="margin-bottom:12px;">
+                    <label>Signature / Footer</label>
+                    <textarea name="footer_text" id="tmpl_foot" rows="3" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">Best regards,
+Quality Management Methods, Nozzles (PS/QMM2-NaP)
+Bosch Limited | Bengaluru-560030 | INDIA</textarea>
+                </div>
+                <button type="submit" class="ac-btn ac-btn-primary">Save Email Template</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ==================== TAB 5: DELIVERY HISTORY ==================== -->
+    {% if active_tab == 'history' %}
+    <div class="filter-card">
+        <div class="filter-heading">
+            <div>
+                <span class="section-kicker">AUDIT LOG &amp; DELIVERY MONITORING</span>
+                <h3>Alert Event &amp; Notification Delivery History</h3>
+            </div>
+            <form method="get" action="/admin/alerts" style="display:flex;gap:8px;flex-wrap:wrap;">
+                <input type="hidden" name="tab" value="history">
+                <select name="severity" style="padding:6px;border:1px solid #cbd5e1;border-radius:5px;">
+                    <option value="">All Severities</option>
+                    <option value="CRITICAL" {% if filters.severity == 'CRITICAL' %}selected{% endif %}>CRITICAL</option>
+                    <option value="WARNING" {% if filters.severity == 'WARNING' %}selected{% endif %}>WARNING</option>
+                    <option value="INFO" {% if filters.severity == 'INFO' %}selected{% endif %}>INFO</option>
+                </select>
+                <select name="status" style="padding:6px;border:1px solid #cbd5e1;border-radius:5px;">
+                    <option value="">All Statuses</option>
+                    <option value="DELIVERED" {% if filters.status == 'DELIVERED' %}selected{% endif %}>DELIVERED</option>
+                    <option value="QUEUED" {% if filters.status == 'QUEUED' %}selected{% endif %}>QUEUED</option>
+                    <option value="FAILED" {% if filters.status == 'FAILED' %}selected{% endif %}>FAILED</option>
+                </select>
+                <select name="event_type" style="padding:6px;border:1px solid #cbd5e1;border-radius:5px;">
+                    <option value="">All Event Types</option>
+                    <option value="PRODUCTION" {% if filters.event_type == 'PRODUCTION' %}selected{% endif %}>PRODUCTION</option>
+                    <option value="TEST" {% if filters.event_type == 'TEST' %}selected{% endif %}>TEST</option>
+                </select>
+                <button type="submit" class="ac-btn ac-btn-primary">Filter</button>
+                <a href="/admin/alerts?tab=history" class="ac-btn ac-btn-outline">Reset</a>
+            </form>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table class="ac-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Event ID</th>
+                        <th>Rule</th>
+                        <th>Severity</th>
+                        <th>Trigger Reason &amp; Station</th>
+                        <th>Delivery Status</th>
+                        <th>Retries</th>
+                        <th>Delivered At / Error</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in deliveries %}
+                    {% set ev = d.event %}
+                    <tr>
+                        <td style="font-size:12px;">{{ ev.triggered_at.strftime('%Y-%m-%d %H:%M:%S') if ev and ev.triggered_at else '-' }}</td>
+                        <td style="font-family:monospace;font-size:11px;">
+                            {{ ev.event_uuid if ev else d.id }}
+                            {% if ev and ev.event_type == 'TEST' %}<span class="st-badge st-QUEUED">TEST</span>{% endif %}
+                        </td>
+                        <td><strong>{{ ev.rule_name_snapshot if ev else 'Rule' }}</strong></td>
+                        <td><span class="sev-badge sev-{{ ev.severity if ev else 'INFO' }}">{{ ev.severity if ev else 'INFO' }}</span></td>
+                        <td style="font-size:12px;">
+                            {{ ev.trigger_reason if ev else '' }}<br>
+                            <small style="color:#64748b;">Station: {{ ev.station if ev else '-' }} | Customer: {{ ev.customer if ev else '-' }}</small>
+                        </td>
+                        <td><span class="st-badge st-{{ d.status }}">{{ d.status }}</span></td>
+                        <td>{{ d.retry_count }} / {{ d.max_retries }}</td>
+                        <td style="font-size:12px;">
+                            {% if d.delivered_at %}
+                                Delivered: {{ d.delivered_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                            {% elif d.error_message %}
+                                <span style="color:#b91c1c;">{{ d.error_message }}</span>
+                            {% else %}
+                                Awaiting Poll / Dispatch
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="display:flex;gap:5px;">
+                                <button type="button" class="ac-btn ac-btn-outline"
+                                    onclick='inspectDelivery({{ d.rendered_subject|tojson }}, {{ d.rendered_body_html|tojson }}, {{ d.payload_json|tojson }})'>
+                                    Inspect
+                                </button>
+                                {% if d.status in ['FAILED', 'QUEUED'] %}
+                                <button type="button" class="ac-btn ac-btn-primary" onclick="retryDelivery({{ d.id }})">Retry</button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="9">No alert delivery records match the current filters.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ==================== TAB 6: SYSTEM HEALTH ==================== -->
+    {% if active_tab == 'health' %}
+    <div class="filter-card">
+        <div class="filter-heading">
+            <div>
+                <span class="section-kicker">POWER AUTOMATE CONNECTOR &amp; RELIABILITY SETTINGS</span>
+                <h3>Enterprise Integration &amp; System Health Configuration</h3>
+            </div>
+        </div>
+        <form method="post" action="/admin/alerts/config/save" style="max-width:720px;">
+            <div class="filter-field" style="margin-bottom:14px;">
+                <label>Power Automate HTTP Webhook Trigger URL (Optional for Push Mode; leave blank if using Poll Mode <code>POST /api/alerts/poll</code>)</label>
+                <input type="text" name="power_automate_webhook_url" value="{{ config.power_automate_webhook_url }}" placeholder="https://prod-xx.westindia.logic.azure.com:443/workflows/..." style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+                <div class="filter-field">
+                    <label>Security Header Name</label>
+                    <input type="text" name="secret_header_name" value="{{ config.secret_header_name }}" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">
+                </div>
+                <div class="filter-field">
+                    <label>Security Header Secret Value (Masked)</label>
+                    <input type="password" name="secret_header_value" value="{{ '********' if config.secret_header_value else '' }}" placeholder="Enter new token to update" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+                <div class="filter-field">
+                    <label>WSA Dashboard Base URL (used in email links)</label>
+                    <input type="text" name="dashboard_base_url" value="{{ config.dashboard_base_url }}" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">
+                </div>
+                <div class="filter-field">
+                    <label>Background Change-Detection Interval (Seconds)</label>
+                    <input type="number" name="poll_interval_seconds" value="{{ config.poll_interval_seconds }}" min="15" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px;">
+                </div>
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;">
+                    <input type="checkbox" name="alerts_paused" value="true" {% if config.alerts_paused %}checked{% endif %}>
+                    Pause all automatic alert evaluations (Maintenance Mode)
+                </label>
+            </div>
+            <button type="submit" class="ac-btn ac-btn-primary">Save Connector Configuration</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal for Test Alert & Delivery Inspection -->
+<div id="acModalBackdrop" class="ac-modal-backdrop" onclick="if(event.target===this)closeAcModal()">
+    <div class="ac-modal">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0;padding-bottom:12px;margin-bottom:16px;">
+            <h3 id="acModalTitle" style="margin:0;">Alert Inspection &amp; Preview</h3>
+            <button type="button" class="ac-btn ac-btn-outline" onclick="closeAcModal()">✕ Close</button>
+        </div>
+        <div id="acModalBody"></div>
+    </div>
+</div>
+
+<script>
+function closeAcModal() {
+    document.getElementById('acModalBackdrop').style.display = 'none';
+}
+
+function populateGroupForm(id, name, dept, desc, emails) {
+    document.getElementById('grp_id').value = id;
+    document.getElementById('grp_name').value = name;
+    document.getElementById('grp_dept').value = dept;
+    document.getElementById('grp_desc').value = desc;
+    document.getElementById('grp_emails').value = emails;
+    document.getElementById('grp-form-title').innerText = id ? 'Edit Group: ' + name : 'Create Recipient Group';
+}
+
+function populateTemplateForm(id, name, desc, subj, intro, obs, act, foot) {
+    document.getElementById('tmpl_id').value = id;
+    document.getElementById('tmpl_name').value = name;
+    document.getElementById('tmpl_desc').value = desc;
+    document.getElementById('tmpl_subj').value = subj;
+    document.getElementById('tmpl_intro').value = intro;
+    document.getElementById('tmpl_obs').value = obs;
+    document.getElementById('tmpl_act').value = act;
+    document.getElementById('tmpl_foot').value = foot;
+    document.getElementById('tmpl-form-title').innerText = 'Edit Template: ' + name;
+}
+
+async function runTestRule(ruleId, sendWebhook) {
+    const res = await fetch(`/api/alerts/rules/${ruleId}/test?send_webhook=${sendWebhook}`, { method: 'POST' });
+    const data = await res.json();
+    document.getElementById('acModalTitle').innerText = `Test Alert Preview — ${data.rule_name}`;
+    document.getElementById('acModalBody').innerHTML = `
+        <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #cbd5e1;margin-bottom:14px;font-size:13px;">
+            <div><strong>Human-Readable Rule Summary:</strong> ${data.human_readable_summary}</div>
+            <div style="margin-top:6px;"><strong>Evaluation Result on Current Excel Data:</strong> ${data.evaluation_reason} (Matched Records: ${data.matched_record_count})</div>
+            <div style="margin-top:6px;"><strong>To Recipients (${data.recipients.to.length}):</strong> ${data.recipients.to.slice(0, 8).join(', ')}</div>
+            <div style="margin-top:4px;"><strong>CC Recipients (${data.recipients.cc.length}):</strong> ${data.recipients.cc.join(', ') || 'None'}</div>
+            <div style="margin-top:6px;"><strong>Subject:</strong> <code>${data.rendered_email.subject}</code></div>
+        </div>
+        <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+            <strong>Rendered Bosch MIS Email Preview:</strong>
+            <button type="button" class="ac-btn ac-btn-primary" onclick="runTestRule(${ruleId}, true)">Queue / Dispatch Test Event to Power Automate</button>
+        </div>
+        <div style="border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;">
+            ${data.rendered_email.body_html}
+        </div>
+    `;
+    document.getElementById('acModalBackdrop').style.display = 'flex';
+}
+
+function inspectDelivery(subject, bodyHtml, payloadJson) {
+    document.getElementById('acModalTitle').innerText = subject || 'Alert Delivery Details';
+    document.getElementById('acModalBody').innerHTML = `
+        <div style="margin-bottom:16px;">
+            <strong>Rendered Email Output:</strong>
+            <div style="border:1px solid #cbd5e1;border-radius:6px;margin-top:8px;overflow:hidden;">${bodyHtml}</div>
+        </div>
+        <div>
+            <strong>Power Automate Structured JSON Payload:</strong>
+            <pre style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:6px;font-size:12px;overflow-x:auto;">${JSON.stringify(JSON.parse(payloadJson || '{}'), null, 2)}</pre>
+        </div>
+    `;
+    document.getElementById('acModalBackdrop').style.display = 'flex';
+}
+
+async function retryDelivery(deliveryId) {
+    await fetch(`/api/alerts/delivery/${deliveryId}/retry`, { method: 'POST' });
+    window.location.reload();
+}
+
+async function evaluateAlertsNow(forceAll) {
+    const res = await fetch(`/api/alerts/evaluate?force_all=${forceAll}`, { method: 'POST' });
+    const data = await res.json();
+    alert(`Evaluation completed!\nScanned: ${data.total_records_scanned} records\nChanges detected: ${data.changes_detected}\nNew Alert Events created: ${data.events_created}`);
+    window.location.reload();
+}
+</script>
+
+{% endblock %}

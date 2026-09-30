@@ -1,87 +1,408 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alert Rule Builder</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 4px; border: 1px solid #ccc; }
-        h1 { margin-top: 0; color: #0056b3; border-bottom: 2px solid #0056b3; padding-bottom: 10px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="text"], input[type="number"], select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .btn { padding: 10px 20px; background: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        .btn:hover { background: #004494; }
-        .nav-bar { margin-bottom: 20px; }
-        .nav-bar a { margin-right: 15px; color: #0056b3; text-decoration: none; }
-        .condition-block { background: #f8f9fa; padding: 15px; border: 1px solid #ddd; margin-bottom: 10px; border-radius: 4px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="nav-bar">
-            <a href="/admin/alerts">← Back to Alerts Dashboard</a>
+{% extends "base.html" %}
+{% block title %}Rule Builder — WSA Quality Alert Engine{% endblock %}
+{% block content %}
+
+<style>
+.rb-section { background:#fff; border:1px solid #cbd5e1; border-radius:8px; padding:20px; margin-bottom:18px; }
+.rb-sec-header { display:flex; align-items:center; gap:10px; border-bottom:1px solid #e2e8f0; padding-bottom:10px; margin-bottom:16px; }
+.rb-step-num { background:#0a1f44; color:#fff; width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
+.rb-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
+.rb-field label { display:block; font-size:12px; font-weight:600; color:#334155; margin-bottom:5px; }
+.rb-field input, .rb-field select, .rb-field textarea { width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:5px; font-size:13px; box-sizing:border-box; }
+.rb-summary-banner { position:sticky; top:10px; z-index:50; background:#0a1f44; color:#fff; padding:14px 18px; border-radius:8px; margin-bottom:20px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.15); }
+.cond-row { display:grid; grid-template-columns:1.3fr 1fr 1.3fr auto; gap:10px; align-items:center; background:#f8fafc; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; }
+.ac-btn { display:inline-flex; align-items:center; gap:5px; padding:8px 14px; border-radius:5px; font-size:13px; font-weight:600; text-decoration:none; cursor:pointer; border:1px solid transparent; }
+.ac-btn-primary { background:#005691; color:#fff; }
+.ac-btn-outline { background:#fff; color:#1e293b; border-color:#cbd5e1; }
+.ac-btn-danger { background:#fff1f2; color:#be123c; border-color:#fecdd3; }
+</style>
+
+<div class="page-content dashboard-page">
+    <div class="page-hero">
+        <div>
+            <div class="eyebrow">ENTERPRISE QUALITY ALERT BUILDER</div>
+            <h1>{{ 'Edit Alert Rule: ' ~ rule.name if rule else 'Create Quality Alert Rule' }}</h1>
+            <p>Configure event-driven or scheduled CRIN Line 5 / WSA quality rules with live plain-English verification.</p>
         </div>
-        
-        <h1>Create / Edit Alert Rule</h1>
-        
-        <form action="#" method="POST">
-            <div class="form-group">
-                <label for="name">Rule Name</label>
-                <input type="text" id="name" name="name" placeholder="e.g., Repeated NOKs at Station QMM3" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="trigger_type">Trigger Type</label>
-                <select id="trigger_type" name="trigger_type">
-                    <option value="NOK">NOK Record</option>
-                    <option value="Threshold">Threshold</option>
-                    <option value="MissingData">Missing Data</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="severity">Severity</label>
-                <select id="severity" name="severity">
-                    <option value="Info">Info</option>
-                    <option value="Warning">Warning</option>
-                    <option value="High">High</option>
-                    <option value="Critical">Critical</option>
-                </select>
-            </div>
-            
-            <h3>Conditions</h3>
-            <div class="condition-block">
-                <div class="form-group">
-                    <label>Field</label>
-                    <select name="field_1">
-                        <option value="Station">Station</option>
-                        <option value="Customer">Customer</option>
-                        <option value="Shift">Shift</option>
-                        <option value="_total_particle">Total Particle</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Operator</label>
-                    <select name="operator_1">
-                        <option value="equals">Equals</option>
-                        <option value=">=">Greater than or Equal to</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Value</label>
-                    <input type="text" name="value_1" placeholder="Value">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="cooldown">Cooldown (Minutes)</label>
-                <input type="number" id="cooldown" name="cooldown" value="60">
-            </div>
-
-            <button type="button" class="btn" onclick="alert('Configuration saved (demo only)')">Save Rule</button>
-        </form>
+        <div>
+            <a href="/admin/alerts?tab=rules" class="ac-btn ac-btn-outline">← Back to Alert Center</a>
+        </div>
     </div>
-</body>
-</html>
+
+    <!-- Sticky Live Human-Readable Summary -->
+    <div class="rb-summary-banner">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#93c5fd;font-weight:700;">LIVE HUMAN-READABLE RULE SUMMARY</div>
+        <div id="liveSummaryText" style="font-size:15px;font-weight:600;margin-top:4px;">
+            When NOK record is detected, send a CRITICAL email to selected recipient groups.
+        </div>
+    </div>
+
+    <form id="ruleBuilderForm" method="post" action="/admin/alerts/rules/save">
+        <input type="hidden" name="rule_id" value="{{ rule.id if rule else '' }}">
+
+        <!-- 1. Basic Information -->
+        <div class="rb-section">
+            <div class="rb-sec-header">
+                <span class="rb-step-num">1</span>
+                <h3 style="margin:0;font-size:16px;">Basic Information &amp; Severity</h3>
+            </div>
+            <div class="rb-grid">
+                <div class="rb-field" style="grid-column:span 2;">
+                    <label>Rule Name *</label>
+                    <input type="text" name="name" id="rb_name" required value="{{ rule.name if rule else '' }}" placeholder="e.g. CRIN Line 5 — Z-Hole Particle Detected" oninput="updateLiveSummary()">
+                </div>
+                <div class="rb-field">
+                    <label>Severity Level</label>
+                    <select name="severity" id="rb_severity" onchange="updateLiveSummary()">
+                        <option value="CRITICAL" {% if not rule or rule.severity == 'CRITICAL' %}selected{% endif %}>CRITICAL</option>
+                        <option value="WARNING" {% if rule and rule.severity == 'WARNING' %}selected{% endif %}>WARNING</option>
+                        <option value="INFO" {% if rule and rule.severity == 'INFO' %}selected{% endif %}>INFO</option>
+                    </select>
+                </div>
+                <div class="rb-field">
+                    <label>Priority (1 = Highest)</label>
+                    <input type="number" name="priority" value="{{ rule.priority if rule else 5 }}" min="1" max="10">
+                </div>
+            </div>
+            <div class="rb-grid" style="margin-top:12px;">
+                <div class="rb-field" style="grid-column:span 3;">
+                    <label>Description</label>
+                    <input type="text" name="description" value="{{ rule.description if rule else '' }}" placeholder="Explain when this alert fires and what action teams should take">
+                </div>
+                <div class="rb-field" style="display:flex;align-items:center;padding-top:18px;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+                        <input type="checkbox" name="is_enabled" value="true" {% if not rule or rule.is_enabled %}checked{% endif %} style="width:auto;">
+                        Rule Enabled
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Trigger Type & Data Source -->
+        <div class="rb-section">
+            <div class="rb-sec-header">
+                <span class="rb-step-num">2</span>
+                <h3 style="margin:0;font-size:16px;">Trigger Type &amp; Evaluation Mode</h3>
+            </div>
+            <div class="rb-grid">
+                <div class="rb-field">
+                    <label>Rule Category</label>
+                    <select name="rule_category" id="rb_category" onchange="updateLiveSummary()">
+                        <option value="EVENT" {% if not rule or rule.rule_category == 'EVENT' %}selected{% endif %}>EVENT RULE (Data Change Triggered)</option>
+                        <option value="SCHEDULED" {% if rule and rule.rule_category == 'SCHEDULED' %}selected{% endif %}>SCHEDULED RULE (Time / Digest Triggered)</option>
+                    </select>
+                </div>
+                <div class="rb-field" style="grid-column:span 2;">
+                    <label>Trigger Condition Archetype</label>
+                    <select name="trigger_type" id="rb_trigger" onchange="updateLiveSummary()">
+                        {% for code, label in trigger_options %}
+                        <option value="{{ code }}" {% if rule and rule.trigger_type == code %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="rb-field">
+                    <label>Data Source Scope</label>
+                    <select name="data_source" id="rb_source">
+                        <option value="ALL" {% if not rule or rule.data_source == 'ALL' %}selected{% endif %}>All Sources (Particle Summary + Investigation)</option>
+                        <option value="PARTICLE_SUMMARY" {% if rule and rule.data_source == 'PARTICLE_SUMMARY' %}selected{% endif %}>WSA Particle Summary Only</option>
+                        <option value="INVESTIGATION" {% if rule and rule.data_source == 'INVESTIGATION' %}selected{% endif %}>CRI/CRIN Investigation Workbook Only</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Filter Conditions & Thresholds -->
+        <div class="rb-section">
+            <div class="rb-sec-header" style="justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span class="rb-step-num">3</span>
+                    <h3 style="margin:0;font-size:16px;">Conditions, Thresholds &amp; Time Windows (AND / OR)</h3>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <label style="font-size:12px;font-weight:600;">Combine Conditions Using:</label>
+                    <select name="logical_operator" id="rb_logic" onchange="updateLiveSummary()" style="padding:5px 10px;border:1px solid #cbd5e1;border-radius:4px;font-weight:700;">
+                        <option value="AND" {% if not rule or rule.logical_operator == 'AND' %}selected{% endif %}>AND (All must match)</option>
+                        <option value="OR" {% if rule and rule.logical_operator == 'OR' %}selected{% endif %}>OR (Any can match)</option>
+                    </select>
+                    <button type="button" class="ac-btn ac-btn-outline" onclick="addConditionRow()">+ Add Condition</button>
+                </div>
+            </div>
+
+            <div id="conditionsContainer">
+                {% if rule and rule.conditions %}
+                    {% for c in rule.conditions %}
+                    <div class="cond-row">
+                        <select name="cond_field" onchange="updateLiveSummary()">
+                            {% for f in field_options %}
+                            <option value="{{ f }}" {% if c.field_name == f %}selected{% endif %}>{{ f }}</option>
+                            {% endfor %}
+                        </select>
+                        <select name="cond_operator" onchange="updateLiveSummary()">
+                            {% for op_code, op_label in operator_options %}
+                            <option value="{{ op_code }}" {% if c.operator == op_code %}selected{% endif %}>{{ op_label }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="text" name="cond_value" value="{{ c.value }}" placeholder="Target value (e.g. NOK, Z hole, EMI, 2)" oninput="updateLiveSummary()">
+                        <button type="button" class="ac-btn ac-btn-danger" onclick="this.parentElement.remove();updateLiveSummary();">Remove</button>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="cond-row">
+                        <select name="cond_field" onchange="updateLiveSummary()">
+                            {% for f in field_options %}
+                            <option value="{{ f }}" {% if f == 'Status' %}selected{% endif %}>{{ f }}</option>
+                            {% endfor %}
+                        </select>
+                        <select name="cond_operator" onchange="updateLiveSummary()">
+                            {% for op_code, op_label in operator_options %}
+                            <option value="{{ op_code }}" {% if op_code == 'eq' %}selected{% endif %}>{{ op_label }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="text" name="cond_value" value="NOK" placeholder="Target value" oninput="updateLiveSummary()">
+                        <button type="button" class="ac-btn ac-btn-danger" onclick="this.parentElement.remove();updateLiveSummary();">Remove</button>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="rb-grid" style="margin-top:14px;">
+                <div class="rb-field">
+                    <label>Threshold Value (Count / Rate % / Days)</label>
+                    <input type="number" step="any" name="threshold_value" id="rb_threshold" value="{{ rule.threshold_value if rule and rule.threshold_value is not None else '' }}" placeholder="e.g. 2 or 5.0" oninput="updateLiveSummary()">
+                </div>
+                <div class="rb-field">
+                    <label>Time Window (Hours)</label>
+                    <input type="number" step="any" name="time_window_hours" id="rb_window" value="{{ rule.time_window_hours if rule and rule.time_window_hours is not None else '' }}" placeholder="e.g. 4" oninput="updateLiveSummary()">
+                </div>
+                <div class="rb-field">
+                    <label>Group By Field (for Window / Rate Rules)</label>
+                    <select name="group_by_field" id="rb_groupby" onchange="updateLiveSummary()">
+                        <option value="">None (Global)</option>
+                        <option value="Station" {% if rule and rule.group_by_field == 'Station' %}selected{% endif %}>Station</option>
+                        <option value="Customer" {% if rule and rule.group_by_field == 'Customer' %}selected{% endif %}>Customer</option>
+                        <option value="Shift" {% if rule and rule.group_by_field == 'Shift' %}selected{% endif %}>Shift</option>
+                        <option value="Type" {% if rule and rule.group_by_field == 'Type' %}selected{% endif %}>Injector Type</option>
+                        <option value="Auditor" {% if rule and rule.group_by_field == 'Auditor' %}selected{% endif %}>Auditor</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Recipients (To & CC Groups + Custom) -->
+        <div class="rb-section">
+            <div class="rb-sec-header">
+                <span class="rb-step-num">4</span>
+                <h3 style="margin:0;font-size:16px;">Recipients (Bosch Functional Groups &amp; Individual Addresses)</h3>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                <div>
+                    <strong style="font-size:13px;color:#0f172a;display:block;margin-bottom:8px;">Primary Recipients (TO):</strong>
+                    {% for g in recipient_groups %}
+                    <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;margin-bottom:6px;font-size:13px;cursor:pointer;">
+                        <input type="checkbox" name="to_group_ids" value="{{ g.id }}" data-gname="{{ g.name }}" {% if g.id in selected_to_groups or (not rule and loop.index <= 2) %}checked{% endif %} onchange="updateLiveSummary()">
+                        <span><strong>{{ g.name }}</strong> <small style="color:#64748b;">({{ g.memberships|length }} emails)</small></span>
+                    </label>
+                    {% endfor %}
+                    <div class="rb-field" style="margin-top:10px;">
+                        <label>Additional Individual TO Emails (comma-separated)</label>
+                        <input type="text" name="extra_to_emails" value="{{ extra_to_emails }}" placeholder="engineer@in.bosch.com">
+                    </div>
+                </div>
+                <div>
+                    <strong style="font-size:13px;color:#0f172a;display:block;margin-bottom:8px;">Carbon Copy Recipients (CC):</strong>
+                    {% for g in recipient_groups %}
+                    <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;margin-bottom:6px;font-size:13px;cursor:pointer;">
+                        <input type="checkbox" name="cc_group_ids" value="{{ g.id }}" data-gname="{{ g.name }}" {% if g.id in selected_cc_groups or (not rule and 'Management' in g.name) %}checked{% endif %} onchange="updateLiveSummary()">
+                        <span><strong>{{ g.name }}</strong> <small style="color:#64748b;">({{ g.memberships|length }} emails)</small></span>
+                    </label>
+                    {% endfor %}
+                    <div class="rb-field" style="margin-top:10px;">
+                        <label>Additional Individual CC Emails (comma-separated)</label>
+                        <input type="text" name="extra_cc_emails" value="{{ extra_cc_emails }}" placeholder="manager@in.bosch.com">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. Email Template & Overrides -->
+        <div class="rb-section">
+            <div class="rb-sec-header">
+                <span class="rb-step-num">5</span>
+                <h3 style="margin:0;font-size:16px;">Email Template &amp; Custom Wording</h3>
+            </div>
+            <div class="rb-grid">
+                <div class="rb-field" style="grid-column:span 2;">
+                    <label>Base Bosch MIS Email Template</label>
+                    <select name="template_id" id="rb_template">
+                        {% for t in email_templates %}
+                        <option value="{{ t.id }}" {% if (rule and rule.template_id == t.id) or (not rule and t.is_default) %}selected{% endif %}>{{ t.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="rb-field" style="grid-column:span 2;">
+                    <label>Custom Subject Override (Optional — leave blank to use template subject)</label>
+                    <input type="text" name="custom_subject" id="rb_custom_subj" value="{{ rule.custom_subject if rule else '' }}" placeholder="[{{ '{{severity}}' }}] RE: CRIN - Line 5 internal rejection analysis MIS ({{ '{{station}}' }})">
+                </div>
+            </div>
+            <div class="rb-field" style="margin-top:12px;">
+                <label>Custom Observation Wording Override (Optional — supports variables like <code>{{ '{{parts_checked}}' }}</code>, <code>{{ '{{particle_location}}' }}</code>)</label>
+                <textarea name="custom_body" id="rb_custom_body" rows="2" placeholder="Leave blank to use the selected template's default observation text">{{ rule.custom_body if rule else '' }}</textarea>
+            </div>
+        </div>
+
+        <!-- 6. Cooldown, Schedule & Retry Settings -->
+        <div class="rb-section">
+            <div class="rb-sec-header">
+                <span class="rb-step-num">6</span>
+                <h3 style="margin:0;font-size:16px;">Cooldown, Schedule &amp; Power Automate Retry Policy</h3>
+            </div>
+            <div class="rb-grid">
+                <div class="rb-field">
+                    <label>Deduplication Cooldown (Minutes)</label>
+                    <input type="number" name="cooldown_minutes" value="{{ rule.cooldown_minutes if rule else 60 }}" min="0">
+                </div>
+                <div class="rb-field">
+                    <label>Scheduled Time (HH:MM for SCHEDULED rules)</label>
+                    <input type="text" name="schedule_time" value="{{ rule.schedule_time if rule and rule.schedule_time else '17:00' }}" placeholder="17:00">
+                </div>
+                <div class="rb-field">
+                    <label>Max Delivery Retries</label>
+                    <input type="number" name="max_retries" value="{{ rule.max_retries if rule else 3 }}" min="0" max="10">
+                </div>
+                <div class="rb-field">
+                    <label>Retry Backoff (Seconds)</label>
+                    <input type="number" name="retry_backoff_seconds" value="{{ rule.retry_backoff_seconds if rule else 60 }}" min="10">
+                </div>
+            </div>
+        </div>
+
+        <!-- 7. Test, Preview & Save -->
+        <div class="rb-section" style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;">
+            <div>
+                <strong>Verify Before Saving:</strong>
+                <span style="font-size:13px;color:#475569;margin-left:6px;">Preview the rendered Bosch MIS email and test against live WSA Excel records.</span>
+            </div>
+            <div style="display:flex;gap:10px;">
+                <button type="button" class="ac-btn ac-btn-outline" onclick="previewDraftRule()">⚡ Test &amp; Preview Email</button>
+                <button type="submit" class="ac-btn ac-btn-primary">✓ Save Alert Rule</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Preview Modal -->
+<div id="rbPreviewBackdrop" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.65);z-index:9999;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+    <div style="background:#fff;max-width:820px;width:100%;max-height:90vh;overflow-y:auto;border-radius:8px;padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0;padding-bottom:10px;margin-bottom:14px;">
+            <h3 style="margin:0;">Live Rule Evaluation &amp; Email Preview</h3>
+            <button type="button" class="ac-btn ac-btn-outline" onclick="document.getElementById('rbPreviewBackdrop').style.display='none'">✕ Close</button>
+        </div>
+        <div id="rbPreviewBody"></div>
+    </div>
+</div>
+
+<script>
+const FIELD_OPTIONS = {{ field_options|tojson }};
+const OPERATOR_OPTIONS = {{ operator_options|tojson }};
+
+function addConditionRow() {
+    const container = document.getElementById('conditionsContainer');
+    const row = document.createElement('div');
+    row.className = 'cond-row';
+    const fieldOpts = FIELD_OPTIONS.map(f => `<option value="${f}">${f}</option>`).join('');
+    const opOpts = OPERATOR_OPTIONS.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('');
+    row.innerHTML = `
+        <select name="cond_field" onchange="updateLiveSummary()">${fieldOpts}</select>
+        <select name="cond_operator" onchange="updateLiveSummary()">${opOpts}</select>
+        <input type="text" name="cond_value" placeholder="Target value" oninput="updateLiveSummary()">
+        <button type="button" class="ac-btn ac-btn-danger" onclick="this.parentElement.remove();updateLiveSummary();">Remove</button>
+    `;
+    container.appendChild(row);
+    updateLiveSummary();
+}
+
+function updateLiveSummary() {
+    const sev = document.getElementById('rb_severity').value;
+    const trigSel = document.getElementById('rb_trigger');
+    const trigText = trigSel.options[trigSel.selectedIndex].text.replace(/\s*\(.*?\)\s*/g, '');
+    const logic = document.getElementById('rb_logic').value;
+
+    const condRows = document.querySelectorAll('#conditionsContainer .cond-row');
+    const conds = [];
+    condRows.forEach(r => {
+        const f = r.querySelector('[name="cond_field"]').value;
+        const opSel = r.querySelector('[name="cond_operator"]');
+        const op = opSel.options[opSel.selectedIndex].text.split('(')[0].trim().toLowerCase();
+        const v = r.querySelector('[name="cond_value"]').value.trim();
+        if (f) conds.push(`${f} ${op} '${v || '*'}'`);
+    });
+
+    const toGroups = Array.from(document.querySelectorAll('input[name="to_group_ids"]:checked')).map(cb => cb.dataset.gname);
+    const ccGroups = Array.from(document.querySelectorAll('input[name="cc_group_ids"]:checked')).map(cb => cb.dataset.gname);
+
+    const th = document.getElementById('rb_threshold').value;
+    const win = document.getElementById('rb_window').value;
+    const grp = document.getElementById('rb_groupby').value;
+
+    let extra = '';
+    if (th) extra += ` (threshold >= ${th})`;
+    if (win) extra += ` within ${win}h`;
+    if (grp) extra += ` grouped by ${grp}`;
+
+    const whereStr = conds.length ? ` where [${conds.join(' ' + logic + ' ')}]` : '';
+    const toStr = toGroups.length ? toGroups.join(', ') : 'configured recipients';
+    const ccStr = ccGroups.length ? ` (CC: ${ccGroups.join(', ')})` : '';
+
+    document.getElementById('liveSummaryText').innerText =
+        `When ${trigText}${whereStr}${extra}, send a ${sev} email to ${toStr}${ccStr}.`;
+}
+
+async function previewDraftRule() {
+    const condRows = document.querySelectorAll('#conditionsContainer .cond-row');
+    const conditions = [];
+    condRows.forEach(r => {
+        conditions.push({
+            field_name: r.querySelector('[name="cond_field"]').value,
+            operator: r.querySelector('[name="cond_operator"]').value,
+            value: r.querySelector('[name="cond_value"]').value,
+        });
+    });
+
+    const payload = {
+        name: document.getElementById('rb_name').value || 'Draft Rule',
+        rule_category: document.getElementById('rb_category').value,
+        trigger_type: document.getElementById('rb_trigger').value,
+        data_source: document.getElementById('rb_source').value,
+        severity: document.getElementById('rb_severity').value,
+        logical_operator: document.getElementById('rb_logic').value,
+        threshold_value: document.getElementById('rb_threshold').value,
+        time_window_hours: document.getElementById('rb_window').value,
+        group_by_field: document.getElementById('rb_groupby').value,
+        template_id: document.getElementById('rb_template').value,
+        custom_subject: document.getElementById('rb_custom_subj').value,
+        custom_body: document.getElementById('rb_custom_body').value,
+        conditions: conditions,
+    };
+
+    const res = await fetch('/api/alerts/preview-draft', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    document.getElementById('rbPreviewBody').innerHTML = `
+        <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #cbd5e1;margin-bottom:14px;font-size:13px;">
+            <div><strong>Evaluation against Live Excel Data:</strong> ${data.evaluation_reason}</div>
+            <div><strong>Matched Records Count:</strong> ${data.matched_record_count}</div>
+            <div><strong>Subject Preview:</strong> <code>${data.rendered_email.subject}</code></div>
+        </div>
+        <div style="border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;">
+            ${data.rendered_email.body_html}
+        </div>
+    `;
+    document.getElementById('rbPreviewBackdrop').style.display = 'flex';
+}
+
+document.addEventListener('DOMContentLoaded', updateLiveSummary);
+</script>
+
+{% endblock %}
